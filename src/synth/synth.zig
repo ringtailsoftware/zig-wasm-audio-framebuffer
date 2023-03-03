@@ -8,11 +8,11 @@ const SynthesizerSettings = ziggysynth.SynthesizerSettings;
 // WebAudio's render quantum size.
 const RENDER_QUANTUM_FRAMES = 128;
 
-var left:[RENDER_QUANTUM_FRAMES]f32 = undefined;
-var right:[RENDER_QUANTUM_FRAMES]f32 = undefined;
-var sampleRate:f32 = 44100;
-var frameCounter:usize = 0;
-var synthesizer:Synthesizer = undefined;
+var left: [RENDER_QUANTUM_FRAMES]f32 = undefined;
+var right: [RENDER_QUANTUM_FRAMES]f32 = undefined;
+var sampleRate: f32 = 44100;
+var frameCounter: usize = 0;
+var synthesizer: Synthesizer = undefined;
 
 pub const std_options = struct {
     pub fn logFn(
@@ -28,15 +28,15 @@ pub const std_options = struct {
     }
 };
 
-export fn noteOn(note:i32, vel:i32) void {
+export fn noteOn(note: i32, vel: i32) void {
     synthesizer.noteOn(0, note, vel);
 }
 
-export fn noteOff(note:i32) void {
+export fn noteOff(note: i32) void {
     synthesizer.noteOff(0, note);
 }
 
-export fn setSampleRate(s:f32) void {
+export fn setSampleRate(s: f32) void {
     sampleRate = s;
 
     // create the synthesizer
@@ -62,4 +62,3 @@ export fn getRightBufPtr() [*]u8 {
 export fn renderSoundQuantum() void {
     synthesizer.render(&left, &right);
 }
-

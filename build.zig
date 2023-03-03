@@ -1,9 +1,9 @@
 const std = @import("std");
 
-fn addExample(b: *std.build.Builder, comptime name:[]const u8, flags:?[]const []const u8, sources:?[]const []const u8) void {
+fn addExample(b: *std.build.Builder, comptime name: []const u8, flags: ?[]const []const u8, sources: ?[]const []const u8) void {
     const mode = b.standardReleaseOptions();
     const lib = b.addSharedLibrary(name, "src/" ++ name ++ "/" ++ name ++ ".zig", .unversioned);
-    lib.setTarget(.{.cpu_arch = .wasm32, .os_tag = .freestanding});
+    lib.setTarget(.{ .cpu_arch = .wasm32, .os_tag = .freestanding });
     lib.rdynamic = true;
     lib.setBuildMode(mode);
     lib.install();
