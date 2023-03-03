@@ -8,6 +8,10 @@ There is a mismatch between low-level audio (found in games, editing tools and m
 
 Using <a href="https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletNode">AudioWorkletNode</a> it is possible to use raw PCM data directly for playback in browsers. These samples demonstrate doing that.
 
+# Demo
+
+Visit https://ringtailsoftware.github.io/zig-wasm-audio/
+
 # Build and test
 
     zig build
