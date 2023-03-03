@@ -40,11 +40,11 @@ The `WasmPcm` (`wasmpcm.js`) class creates an AudioWorkletNode WASMWorkletProces
 
 ## The ringbuffer
 
-The ringbuffer is used is <a href="https://github.com/padenot/ringbuf.js/">ringbuf.js</a> which provides a "thread-safe wait-free single-consumer single-producer ring buffer" backed by a SharedArrayBuffer.
+The ringbuffer used is <a href="https://github.com/padenot/ringbuf.js/">ringbuf.js</a> which provides a "thread-safe wait-free single-consumer single-producer ring buffer" backed by a SharedArrayBuffer.
 
 # Compatibility
 
-Working in Firefox (111.0) and Chrome (110.0.5481.177). Safari does not work - though it sometimes does, perhaps suggesting a race condition. Unnfortunately, Safari fails silently (literally).
+Working in Firefox (111.0) and Chrome (110.0.5481.177). Safari does not work - though it sometimes does, perhaps suggesting a race condition. Unfortunately, Safari fails silently (literally).
 
 # CORS (Cross-Origin Resource Sharing)
 
