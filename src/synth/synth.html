@@ -56,7 +56,7 @@
                     var keyEls = document.getElementsByClassName('key');
                     for (var i = 0; i < keyEls.length; i++) {
                         if (parseInt(keyEls[i].dataset.keycode) == event.keyCode) {
-                            WasmPcm.getInstance().exports.noteOn(parseInt(keyEls[i].dataset.note), 100);
+                            WasmPcm.getInstance().exports.noteOn(parseInt(keyEls[i].dataset.note), 127);
                         }
                     }
                 }
@@ -74,10 +74,10 @@
             for (var i = 0; i < keyEls.length; i++) {
                 (function(note){
                     keyEls[i].addEventListener("mousedown", () => {
-                        WasmPcm.getInstance().exports.noteOn(note, 100);
+                        WasmPcm.getInstance().exports.noteOn(note, 127);
                     });
                     keyEls[i].addEventListener("mouseup", () => {
-                        WasmPcm.getInstance().exports.noteOff(note, 100);
+                        WasmPcm.getInstance().exports.noteOff(note);
                     });
                 })(parseInt(keyEls[i].dataset.note));
             }
