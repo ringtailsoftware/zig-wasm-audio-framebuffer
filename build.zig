@@ -7,6 +7,7 @@ pub fn build(b: *std.build.Builder) void {
 
     b.installFile("src/index.html", "index.html");
     b.installFile("src/pcm-processor.js", "pcm-processor.js");
+    b.installFile("src/wasmpcm.js", "wasmpcm.js");
     b.installFile("src/ringbuf.js", "ringbuf.js");
     b.installFile("src/coi-serviceworker.js", "coi-serviceworker.js");
 
