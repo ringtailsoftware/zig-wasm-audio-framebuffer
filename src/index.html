@@ -46,8 +46,8 @@
         }
     }
 
-    async function startAudio(context) {
-        await fetch("lib/zig-wasm-audio.wasm").then((response) => {
+    async function startAudio(wasmFile, context) {
+        await fetch(wasmFile).then((response) => {
             return response.arrayBuffer();
         }).then((bytes) => {
             return WebAssembly.instantiate(bytes, imports);
@@ -74,14 +74,15 @@
             document.getElementById('info').innerHTML = 'rd:' + rd + ' wr:' + wr + ' total:' + total;
             update();
         }, 50);
+
+        context.resume();
     }
 
     window.addEventListener('load', async () => {
         const buttonEl = document.getElementById('button-start');
         buttonEl.addEventListener('click', async () => {
             const audioContext = new AudioContext();
-            await startAudio(audioContext);
-            audioContext.resume();
+            await startAudio('lib/zig-wasm-audio.wasm', audioContext);
             buttonEl.style.visibility = 'hidden';
         }, false);
 
