@@ -15,19 +15,6 @@ var frameCounter:usize = 0;
 var ctx:pocketmod.pocketmod_context = undefined;
 const mod_data = @embedFile("bananasplit.mod");
 
-pub const std_options = struct {
-    pub fn logFn(
-        comptime message_level: std.log.Level,
-        comptime scope: @TypeOf(.enum_literal),
-        comptime format: []const u8,
-        args: anytype,
-    ) void {
-        _ = message_level;
-        _ = scope;
-        _ = format;
-        _ = args;
-    }
-};
 
 export fn setSampleRate(s:f32) void {
     sampleRate = s;
@@ -44,26 +31,22 @@ export fn getRightBufPtr() [*]u8 {
 }
 
 export fn renderSoundQuantum() void {
-    var bytes:usize = undefined;
-    var i:usize = undefined;
+    var bytes:usize = RENDER_QUANTUM_FRAMES * 4 * 2;
 
-    var lbuf = @ptrCast([*]u8, &left);
-    var rbuf = @ptrCast([*]u8, &right);
-    bytes = RENDER_QUANTUM_FRAMES * 8;
-    i = 0;
+    // pocketmod produces interleaved l/r/l/r data, so fetch a double batch
+    var lrbuf = @ptrCast([*]u8, &leftright);
+    bytes = RENDER_QUANTUM_FRAMES * 4 * 2;
+    var i:usize = 0;
     while (i < bytes) {
-        const count = pocketmod.pocketmod_render(&ctx, lbuf + i, @intCast(c_int, bytes - i));
+        const count = pocketmod.pocketmod_render(&ctx, lrbuf + i, @intCast(c_int, bytes - i));
         i += @intCast(usize, count);
     }
 
-
-//    var rbuf = @ptrCast([*]u8, &right);
-//    bytes = RENDER_QUANTUM_FRAMES * 4;
-//    i = 0;
-//    while (i < bytes) {
-//        const count = pocketmod.pocketmod_render(&ctx, rbuf + i, @intCast(c_int, bytes - i));
-//        i += @intCast(usize, count);
-//    }
-
+    // then deinterleave it into the l and r buffers
+    i = 0;
+    while(i<RENDER_QUANTUM_FRAMES) : (i += 1) {
+        left[i] = leftright[i*2];
+        right[i] = leftright[i*2+1];
+    }
 }
 

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>zig-wasm-audio</title>
+</head>
+
+<script src="coi-serviceworker.js"></script>
+
+<script type="module" defer="true">
+    import { WasmPcm } from "./wasmpcm.js";
+
+    window.addEventListener('load', async () => {
+        const buttonEl = document.getElementById('button-start');
+        buttonEl.addEventListener('click', async () => {
+            const audioContext = new AudioContext();
+            await WasmPcm.startAudio('lib/mod.wasm', audioContext);
+            buttonEl.style.visibility = 'hidden';
+        }, false);
+    });
+
+</script>
+
+<body>
+    <p>
+        <button id="button-start">START</button>
+    </p>
+    <p>
+        <a href="https://github.com/rombankzero/pocketmod/">pocketmod</a>, is a small ANSI C library for turning ProTracker MOD files into playable PCM audio
+    </p>
+</body>
+
+</html>
