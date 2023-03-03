@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>zig-wasm-audio</title>
+    <style>
+    /* https://codepen.io/enteleform/pen/PepqYV */
+        .key {
+          float: left;
+          position: relative;
+        }
+
+        .white {
+          height: 14.4vw;
+          width: 3.8095238095vw;
+          z-index: 1;
+          border-top: 0.12vw solid #000000;
+          border-bottom: 0.12vw solid #000000;
+          border-left: 0.12vw solid #000000;
+          background-color: #FFFFFF;
+        }
+
+        .black {
+          height: 7.92vw;
+          width: 2.0952380952vw;
+          z-index: 2;
+          border: 0.12vw solid #000000;
+          background-color: #000000;
+        }
+
+        .a, .b, .d, .e, .g, .black {
+          margin: 0 0 0 -1.1676190476vw;
+        }
+
+        #keyboard > .key:last-child {
+          border-right: 0.12vw solid #000000;
+        }
+
+    </style>
+</head>
+
+<script src="coi-serviceworker.js"></script>
+
+<script type="module" defer="true">
+    import { WasmPcm } from "./wasmpcm.js";
+
+    window.addEventListener('load', async () => {
+        const buttonEl = document.getElementById('button-start');
+        buttonEl.addEventListener('click', async () => {
+            const audioContext = new AudioContext();
+            await WasmPcm.startAudio('lib/synth.wasm', audioContext);
+            buttonEl.style.visibility = 'hidden';
+
+            document.addEventListener('keydown', (event) => {
+                if (!event.repeat) {
+                    var keyEls = document.getElementsByClassName('key');
+                    for (var i = 0; i < keyEls.length; i++) {
+                        if (parseInt(keyEls[i].dataset.keycode) == event.keyCode) {
+                            WasmPcm.getInstance().exports.noteOn(parseInt(keyEls[i].dataset.note), 100);
+                        }
+                    }
+                }
+            });
+            document.addEventListener('keyup', (event) => {
+                var keyEls = document.getElementsByClassName('key');
+                for (var i = 0; i < keyEls.length; i++) {
+                    if (parseInt(keyEls[i].dataset.keycode) == event.keyCode) {
+                        WasmPcm.getInstance().exports.noteOff(parseInt(keyEls[i].dataset.note));
+                    }
+                }
+            });
+
+            var keyEls = document.getElementsByClassName('key');
+            for (var i = 0; i < keyEls.length; i++) {
+                (function(note){
+                    keyEls[i].addEventListener("mousedown", () => {
+                        WasmPcm.getInstance().exports.noteOn(note, 100);
+                    });
+                    keyEls[i].addEventListener("mouseup", () => {
+                        WasmPcm.getInstance().exports.noteOff(note, 100);
+                    });
+                })(parseInt(keyEls[i].dataset.note));
+            }
+
+            document.getElementById('keyboard').style.display = 'block';
+        }, false);
+
+    });
+
+</script>
+
+<body>
+    <p>
+        <button id="button-start">START</button>
+    </p>
+    <p>
+        Simple MIDI synth with SoundFont2 file. Click, or use keyboard keys 'a' to ';'
+    </p>
+    <p>
+        <div id="keyboard" style="display:none">
+          <div class="key white c" data-note=48 data-keycode=65></div>
+          <div class="key black c_sharp" data-note=49 data-keycode=83></div>
+          <div class="key white d" data-note=50 data-keycode=68></div>
+          <div class="key black d_sharp" data-note=51 data-keycode=70></div>
+          <div class="key white e" data-note=52 data-keycode=71></div>
+          <div class="key white f" data-note=53 data-keycode=72></div>
+          <div class="key black f_sharp" data-note=54 data-keycode=74></div>
+          <div class="key white g" data-note=55 data-keycode=75></div>
+          <div class="key black g_sharp" data-note=56 data-keycode=76></div>
+          <div class="key white a" data-note=57 data-keycode=59></div>
+          <div class="key black a_sharp" data-note=58></div>
+          <div class="key white b" data-note=59></div>
+          <div class="key white c" data-note=60></div>
+          <div class="key black c_sharp" data-note=61></div>
+          <div class="key white d" data-note=62></div>
+          <div class="key black d_sharp" data-note=63></div>
+          <div class="key white e" data-note=64></div>
+          <div class="key white f" data-note=65></div>
+          <div class="key black f_sharp" data-note=66></div>
+          <div class="key white g" data-note=67></div>
+          <div class="key black g_sharp" data-note=68></div>
+          <div class="key white a" data-note=69></div>
+          <div class="key black a_sharp" data-note=70></div>
+          <div class="key white b" data-note=71></div>
+          <div class="key white c" data-note=72></div>
+          <div class="key black c_sharp" data-note=73></div>
+          <div class="key white d" data-note=74></div>
+          <div class="key black d_sharp" data-note=75></div>
+          <div class="key white e" data-note=76></div>
+          <div class="key white f" data-note=77></div>
+          <div class="key black f_sharp" data-note=78></div>
+          <div class="key white g" data-note=79></div>
+          <div class="key black g_sharp" data-note=80></div>
+          <div class="key white a" data-note=81></div>
+          <div class="key black a_sharp" data-note=82></div>
+          <div class="key white b" data-note=83></div>
+        </div>
+    </p>
+</body>
+
+</html>
