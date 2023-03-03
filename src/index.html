@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>zig-wasm-audio</title>
+</head>
+
+<script src="coi-serviceworker.js"></script>
+
+<script type="module" defer="true">
+    import { RingBuffer } from "./ringbuf.js";
+    const RENDER_QUANTUM_FRAMES = 128;  // web audio's fixed block size
+    let audioWorklet = null;
+    let maxQuanta = 100;    // ringbuffer size in audio blocks
+    let sab = new SharedArrayBuffer((RENDER_QUANTUM_FRAMES*4) * maxQuanta);  // 4 bytes per float
+    let rb = new RingBuffer(sab, Float32Array);
+    let globalInstance = null;
+
+    let imports = {
+        env: {
+        }
+    };
+
+    fetch("lib/zig-wasm-audio.wasm").then((response) => {
+        return response.arrayBuffer();
+    }).then((bytes) => {
+        return WebAssembly.instantiate(bytes, imports);
+    }).then((results) => {
+        let instance = results.instance;
+        globalInstance = instance;
+    }).catch((err) => {
+        console.log(err);
+    });
+
+    function update() {
+        const wasmMemoryArray = new Uint8Array(globalInstance.exports.memory.buffer);
+        const leftBufPtr = globalInstance.exports.getLeftBufPtr();
+        const rightBufPtr = globalInstance.exports.getRightBufPtr();
+
+        var leftArray = new Float32Array(wasmMemoryArray.buffer, leftBufPtr, RENDER_QUANTUM_FRAMES);
+        var rightArray = new Float32Array(wasmMemoryArray.buffer, rightBufPtr, RENDER_QUANTUM_FRAMES);
+
+        if (audioWorklet != null) {
+            const quanta = Math.floor(rb.availableWrite() / (RENDER_QUANTUM_FRAMES*2));
+            //console.log("quanta", quanta, "avwr", rb.availableWrite());
+
+            for (var n=0;n<quanta;n++) {
+                globalInstance.exports.renderSoundQuantum();
+                if (RENDER_QUANTUM_FRAMES != rb.push(leftArray)) {
+                    console.log("push failed!");
+                }
+                if (RENDER_QUANTUM_FRAMES != rb.push(rightArray)) {
+                    console.log("push failed!");
+                }
+            }
+        }
+    }
+
+    async function startAudio(context) {
+        await context.audioWorklet.addModule('pcm-processor.js');
+        const pcmProcessor = new AudioWorkletNode(context, 'pcm-worklet-processor', {
+            processorOptions: {sab:sab},
+            outputChannelCount: [2] // stereo
+        });
+        pcmProcessor.connect(context.destination);
+        audioWorklet = pcmProcessor;
+
+        setInterval(() => {
+            const rd = rb.availableRead();
+            const wr = rb.availableWrite();
+            const total = maxQuanta * RENDER_QUANTUM_FRAMES;
+            document.getElementById('info').innerHTML = 'rd:' + rd + ' wr:' + wr + ' total:' + total;
+            update();
+        }, 50);
+    }
+
+    window.addEventListener('load', async () => {
+        const buttonEl = document.getElementById('button-start');
+        buttonEl.addEventListener('click', async () => {
+            const audioContext = new AudioContext();
+            globalInstance.exports.setSampleRate(audioContext.sampleRate);
+            await startAudio(audioContext);
+            audioContext.resume();
+            buttonEl.style.visibility = 'hidden';
+        }, false);
+
+        // hook up sliders
+        var sliderLeftEl = document.getElementById("lfreq");
+        var sliderLeftValEl = document.getElementById("lfreq_val");
+        sliderLeftEl.oninput = function() {
+            globalInstance.exports.setLeftFreq(this.value);
+            sliderLeftValEl.innerHTML = this.value;
+        };
+        sliderLeftEl.onchange = function() {
+            globalInstance.exports.setLeftFreq(this.value);
+            sliderLeftValEl.innerHTML = this.value;
+        };
+        var sliderRightEl = document.getElementById("rfreq");
+        var sliderRightValEl = document.getElementById("rfreq_val");
+        sliderRightEl.oninput = function() {
+            globalInstance.exports.setRightFreq(this.value);
+            sliderRightValEl.innerHTML = this.value;
+        };
+        sliderRightEl.onchange = function() {
+            globalInstance.exports.setRightFreq(this.value);
+            sliderRightValEl.innerHTML = this.value;
+        };
+    });
+
+</script>
+
+<body>
+    <p>
+        <button id="button-start">START</button>
+    </p>
+    <p>
+        Left frequency<br>
+        <input type="range" min="1" max="1000" value="220" id="lfreq"><span id="lfreq_val">220</span>Hz<br>
+        Right frequency<br>
+        <input type="range" min="1" max="1000" value="220" id="rfreq"><span id="rfreq_val">220</span>Hz<br>
+    </p>
+    <p>
+        <span id="info"></span>
+    </p>
+</body>
+
+</html>
