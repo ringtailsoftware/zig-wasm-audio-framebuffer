@@ -11,11 +11,12 @@ pub fn build(b: *std.build.Builder) void {
     b.installFile("src/ringbuf.js", "ringbuf.js");
     b.installFile("src/coi-serviceworker.js", "coi-serviceworker.js");
 
-    const lib = b.addSharedLibrary("zig-wasm-audio", "src/main.zig", .unversioned);
-    lib.setTarget(.{.cpu_arch = .wasm32, .os_tag = .freestanding});
-    lib.rdynamic = true;
-    lib.setBuildMode(mode);
-    lib.install();
+    const sinetoneLib = b.addSharedLibrary("sinetone", "src/sinetone.zig", .unversioned);
+    sinetoneLib.setTarget(.{.cpu_arch = .wasm32, .os_tag = .freestanding});
+    sinetoneLib.rdynamic = true;
+    sinetoneLib.setBuildMode(mode);
+    sinetoneLib.install();
+    b.installFile("src/sinetone.html", "sinetone.html");
 
 
 }
