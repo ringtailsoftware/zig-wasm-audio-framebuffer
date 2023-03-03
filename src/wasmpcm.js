@@ -32,6 +32,10 @@ function pcmProcess() {
 }
 
 export class WasmPcm {
+    static getInstance() {
+        return globalInstance;
+    }
+
     static async startAudio(wasmFile, context) {
         await fetch(wasmFile).then((response) => {
             return response.arrayBuffer();

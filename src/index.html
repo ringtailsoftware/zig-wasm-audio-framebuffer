@@ -21,22 +21,22 @@
         // hook up sliders
         var sliderLeftEl = document.getElementById("lfreq");
         var sliderLeftValEl = document.getElementById("lfreq_val");
+        var sliderRightEl = document.getElementById("rfreq");
+        var sliderRightValEl = document.getElementById("rfreq_val");
         sliderLeftEl.oninput = function() {
-            globalInstance.exports.setLeftFreq(this.value);
+            WasmPcm.getInstance().exports.setLeftFreq(this.value);
             sliderLeftValEl.innerHTML = this.value;
         };
         sliderLeftEl.onchange = function() {
-            globalInstance.exports.setLeftFreq(this.value);
+            WasmPcm.getInstance().exports.setLeftFreq(this.value);
             sliderLeftValEl.innerHTML = this.value;
         };
-        var sliderRightEl = document.getElementById("rfreq");
-        var sliderRightValEl = document.getElementById("rfreq_val");
         sliderRightEl.oninput = function() {
-            globalInstance.exports.setRightFreq(this.value);
+            WasmPcm.getInstance().exports.setRightFreq(this.value);
             sliderRightValEl.innerHTML = this.value;
         };
         sliderRightEl.onchange = function() {
-            globalInstance.exports.setRightFreq(this.value);
+            WasmPcm.getInstance().exports.setRightFreq(this.value);
             sliderRightValEl.innerHTML = this.value;
         };
     });
