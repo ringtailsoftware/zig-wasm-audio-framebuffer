@@ -26,4 +26,5 @@ pub fn build(b: *std.build.Builder) void {
     addExample(b, "sinetone", null, null);
     addExample(b, "synth", null, null);
     addExample(b, "mod", &.{"-Wall"}, &.{"src/mod/pocketmod.c"});
+    addExample(b, "video", &.{"-Wall"}, &.{"src/mod/pocketmod.c"});
 }

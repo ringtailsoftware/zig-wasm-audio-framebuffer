@@ -46,8 +46,8 @@ export fn setSampleRate(s: f32) void {
     var fbs = std.io.fixedBufferStream(data);
     var reader = fbs.reader();
     var sound_font = SoundFont.init(allocator, reader) catch unreachable;
-    var settings = SynthesizerSettings.init(44100);
-    settings.block_size = 128;
+    var settings = SynthesizerSettings.init(@floatToInt(i32, s));
+    settings.block_size = RENDER_QUANTUM_FRAMES;
     synthesizer = Synthesizer.init(allocator, sound_font, settings) catch unreachable;
 }
 

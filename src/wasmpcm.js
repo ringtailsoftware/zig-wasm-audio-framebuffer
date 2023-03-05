@@ -6,6 +6,29 @@ let maxQuanta = 100;    // ringbuffer size in audio blocks
 let sab = new SharedArrayBuffer((RENDER_QUANTUM_FRAMES*4) * maxQuanta);  // 4 bytes per float
 let rb = new RingBuffer(sab, Float32Array);
 let globalInstance = null;
+let console_buffer = '';
+let lastFrameUs = getTimeUs();
+
+function console_write(dataPtr, len) {
+    const wasmMemoryArray = new Uint8Array(globalInstance.exports.memory.buffer);
+    var arr = new Uint8Array(wasmMemoryArray.buffer, dataPtr, len);
+    let string = new TextDecoder().decode(arr);
+
+    console_buffer += string.toString('binary');
+
+    // force output of very long line
+    if (console_buffer.length > 1024) {
+        console.log(console_buffer);
+        console_buffer = '';
+    }
+
+    // break on lines
+    let lines = console_buffer.split(/\r?\n/);
+    if (lines.length > 1) {
+        console_buffer = lines.pop();
+        lines.forEach(l => console.log(l));
+    }
+}
 
 function pcmProcess() {
     const wasmMemoryArray = new Uint8Array(globalInstance.exports.memory.buffer);
@@ -31,17 +54,41 @@ function pcmProcess() {
     }
 }
 
+function renderGraphics(canvas) {
+    const ctx = canvas.getContext('2d');
+
+    const WIDTH = 320;
+    const HEIGHT = 240;
+
+    const wasmMemoryArray = new Uint8Array(globalInstance.exports.memory.buffer);
+    const gfxBufPtr = globalInstance.exports.getGfxBufPtr();
+    const now = getTimeUs();
+    globalInstance.exports.update(now/1000 - lastFrameUs/1000);
+    lastFrameUs = now;
+    globalInstance.exports.renderGfx();
+    var gfxArray = new Uint8ClampedArray(wasmMemoryArray.buffer, gfxBufPtr, WIDTH*HEIGHT*4);
+    const imageData = new ImageData(gfxArray, WIDTH, HEIGHT);
+    ctx.putImageData(imageData, 0, 0);
+}
+
+function getTimeUs() {
+    return window.performance.now() * 1000;
+}
+
 export class WasmPcm {
     static getInstance() {
         return globalInstance;
     }
 
     static async startAudio(wasmFile, context) {
+        // fetch wasm and instantiate
         await fetch(wasmFile).then((response) => {
             return response.arrayBuffer();
         }).then((bytes) => {
             let imports = {
                 env: {
+                    console_write: console_write,
+                    getTimeUs: getTimeUs
                 }
             };
             return WebAssembly.instantiate(bytes, imports);
@@ -53,6 +100,7 @@ export class WasmPcm {
             console.log(err);
         });
 
+        // start audio
         await context.audioWorklet.addModule('pcm-processor.js');
         const pcmProcessor = new AudioWorkletNode(context, 'pcm-worklet-processor', {
             processorOptions: {sab:sab},
@@ -61,13 +109,34 @@ export class WasmPcm {
         pcmProcessor.connect(context.destination);
         audioWorklet = pcmProcessor;
 
-        setInterval(() => {
-            const rd = rb.availableRead();
-            const wr = rb.availableWrite();
-            const total = maxQuanta * RENDER_QUANTUM_FRAMES;
-            //console.log('rd:' + rd + ' wr:' + wr + ' total:' + total);
+        // tell wasm to start
+        if (globalInstance.exports.init) {
+            globalInstance.exports.init();
+        }
+
+        // attach key handlers
+        if (globalInstance.exports.keyevent) {
+            document.addEventListener('keydown', (event) => {
+                globalInstance.exports.keyevent(event.keyCode, true);
+            });
+            document.addEventListener('keyup', (event) => {
+                globalInstance.exports.keyevent(event.keyCode, false);
+            });
+        }
+
+        const update = () => {
+            // poll sound
             pcmProcess();
-        }, 50);
+
+            // poll graphics
+            let canvasEl = document.getElementById('canvas');
+            if (canvasEl) {
+                renderGraphics(canvasEl);
+            }
+            requestAnimationFrame(update);
+        };
+
+        requestAnimationFrame(update);
 
         context.resume();
     }

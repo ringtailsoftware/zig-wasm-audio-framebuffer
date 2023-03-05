@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>zig-wasm-audio</title>
+    <style>
+    canvas {
+        width: 320px;
+        height: 240px;
+        image-rendering: crisp-edges;
+        border-style: solid;
+    }
+
+    </style>
+</head>
+
+<script src="coi-serviceworker.js"></script>
+
+<script type="module" defer="true">
+    import { WasmPcm } from "./wasmpcm.js";
+
+
+    window.addEventListener('load', async () => {
+        const buttonEl = document.getElementById('button-start');
+        buttonEl.addEventListener('click', async () => {
+            const audioContext = new AudioContext();
+            await WasmPcm.startAudio('lib/video.wasm', audioContext);
+            buttonEl.style.visibility = 'hidden';
+
+            let canvasEl = document.getElementById('canvas');
+            canvasEl.style.display = 'block';
+        }, false);
+    });
+
+</script>
+
+<body>
+    <p>
+        <button id="button-start">START</button>
+        <canvas id="canvas" width=320 height=240 style="display:none">
+    </p>
+    <p>
+        320x240x32bpp graphics buffer, sound fx (midi) and music (mod)<br>
+        Use left and right arrow keys to move
+    </p>
+
+</body>
+
+</html>
