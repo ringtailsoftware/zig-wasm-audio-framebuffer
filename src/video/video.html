@@ -19,14 +19,13 @@
 <script type="module" defer="true">
     import { WasmPcm } from "./wasmpcm.js";
 
-
     window.addEventListener('load', async () => {
+        await WasmPcm.init('lib/video.wasm');
         const buttonEl = document.getElementById('button-start');
         buttonEl.addEventListener('click', async () => {
-            const audioContext = new AudioContext();
-            await WasmPcm.startAudio('lib/video.wasm', audioContext);
-            buttonEl.style.visibility = 'hidden';
+            await WasmPcm.start();
 
+            buttonEl.style.visibility = 'hidden';
             let canvasEl = document.getElementById('canvas');
             canvasEl.style.display = 'block';
         }, false);

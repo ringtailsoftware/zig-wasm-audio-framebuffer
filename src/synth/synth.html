@@ -45,10 +45,10 @@
     import { WasmPcm } from "./wasmpcm.js";
 
     window.addEventListener('load', async () => {
+        await WasmPcm.init('lib/synth.wasm');
         const buttonEl = document.getElementById('button-start');
         buttonEl.addEventListener('click', async () => {
-            const audioContext = new AudioContext();
-            await WasmPcm.startAudio('lib/synth.wasm', audioContext);
+            await WasmPcm.start();
             buttonEl.style.visibility = 'hidden';
 
             document.addEventListener('keydown', (event) => {

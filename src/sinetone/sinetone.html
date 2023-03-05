@@ -11,10 +11,10 @@
     import { WasmPcm } from "./wasmpcm.js";
 
     window.addEventListener('load', async () => {
+        await WasmPcm.init('lib/sinetone.wasm');
         const buttonEl = document.getElementById('button-start');
         buttonEl.addEventListener('click', async () => {
-            const audioContext = new AudioContext();
-            await WasmPcm.startAudio('lib/sinetone.wasm', audioContext);
+            await WasmPcm.start();
             buttonEl.style.visibility = 'hidden';
         }, false);
 

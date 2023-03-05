@@ -8,6 +8,7 @@ let rb = new RingBuffer(sab, Float32Array);
 let globalInstance = null;
 let console_buffer = '';
 let lastFrameUs = getTimeUs();
+var audioContext = null;
 
 function console_write(dataPtr, len) {
     const wasmMemoryArray = new Uint8Array(globalInstance.exports.memory.buffer);
@@ -80,7 +81,8 @@ export class WasmPcm {
         return globalInstance;
     }
 
-    static async startAudio(wasmFile, context) {
+    static async init(wasmFile) {
+        audioContext = new AudioContext();
         // fetch wasm and instantiate
         await fetch(wasmFile).then((response) => {
             return response.arrayBuffer();
@@ -95,23 +97,30 @@ export class WasmPcm {
         }).then((results) => {
             let instance = results.instance;
             globalInstance = instance;
-            globalInstance.exports.setSampleRate(context.sampleRate);
         }).catch((err) => {
             console.log(err);
         });
 
+        
+        await audioContext.audioWorklet.addModule('pcm-processor.js');
+    }
+
+    static async start() {
         // start audio
-        await context.audioWorklet.addModule('pcm-processor.js');
-        const pcmProcessor = new AudioWorkletNode(context, 'pcm-worklet-processor', {
+        const pcmProcessor = new AudioWorkletNode(audioContext, 'pcm-worklet-processor', {
             processorOptions: {sab:sab},
             outputChannelCount: [2] // stereo
         });
-        pcmProcessor.connect(context.destination);
+        pcmProcessor.connect(audioContext.destination);
         audioWorklet = pcmProcessor;
 
         // tell wasm to start
         if (globalInstance.exports.init) {
             globalInstance.exports.init();
+        }
+
+        if (globalInstance.exports.setSampleRate) {
+            globalInstance.exports.setSampleRate(audioContext.sampleRate);
         }
 
         // attach key handlers
@@ -138,6 +147,6 @@ export class WasmPcm {
 
         requestAnimationFrame(update);
 
-        context.resume();
+        audioContext.resume();
     }
 }
