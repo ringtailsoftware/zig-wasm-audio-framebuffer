@@ -13,6 +13,7 @@
     window.addEventListener('load', async () => {
         await WasmPcm.init('lib/mod.wasm');
         const buttonEl = document.getElementById('button-start');
+        buttonEl.disabled = false;
         buttonEl.addEventListener('click', async () => {
             await WasmPcm.start();
             buttonEl.style.visibility = 'hidden';
@@ -23,7 +24,7 @@
 
 <body>
     <p>
-        <button id="button-start">START</button>
+        <button id="button-start" disabled>START</button>
     </p>
     <p>
         <a href="https://github.com/rombankzero/pocketmod/">pocketmod</a>, is a small ANSI C library for turning ProTracker MOD files into playable PCM audio</br>

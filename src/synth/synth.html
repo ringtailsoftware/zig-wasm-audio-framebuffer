@@ -47,6 +47,7 @@
     window.addEventListener('load', async () => {
         await WasmPcm.init('lib/synth.wasm');
         const buttonEl = document.getElementById('button-start');
+        buttonEl.disabled = false;
         buttonEl.addEventListener('click', async () => {
             await WasmPcm.start();
             buttonEl.style.visibility = 'hidden';
@@ -91,7 +92,7 @@
 
 <body>
     <p>
-        <button id="button-start">START</button>
+        <button id="button-start" disabled>START</button>
     </p>
     <p>
         <a href="https://github.com/sinshu/ziggysynth">ZiggySynth</a> is a SoundFont MIDI synthesizer written in pure Zig<br>
