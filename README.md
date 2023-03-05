@@ -44,7 +44,11 @@ The ringbuffer used is <a href="https://github.com/padenot/ringbuf.js/">ringbuf.
 
 # Compatibility
 
-Working in Firefox (111.0) and Chrome (110.0.5481.177). Safari does not work - though it sometimes does, perhaps suggesting a race condition. Unfortunately, Safari fails silently (literally).
+Tested on Safari/Chrome/Firefox on MacOS, Safari on iOS.
+
+# iOS unmute
+
+By default web audio plays under the same rules as the ringer. The `unmute.js` script loops a constant silence in the background to force playback while the mute button is on.
 
 # CORS (Cross-Origin Resource Sharing)
 
