@@ -22,6 +22,7 @@ pub fn build(b: *std.build.Builder) void {
     b.installFile("src/wasmpcm.js", "wasmpcm.js");
     b.installFile("src/ringbuf.js", "ringbuf.js");
     b.installFile("src/coi-serviceworker.js", "coi-serviceworker.js");
+    b.installFile("src/unmute.js", "unmute.js");
 
     addExample(b, "sinetone", null, null);
     addExample(b, "synth", null, null);

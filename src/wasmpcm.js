@@ -1,4 +1,5 @@
 import { RingBuffer } from "./ringbuf.js";
+import { unmute } from "./unmute.js";
 
 const RENDER_QUANTUM_FRAMES = 128;  // web audio's fixed block size
 let audioWorklet = null;
@@ -83,6 +84,7 @@ export class WasmPcm {
 
     static async init(wasmFile) {
         audioContext = new AudioContext();
+
         // fetch wasm and instantiate
         await fetch(wasmFile).then((response) => {
             return response.arrayBuffer();
@@ -147,6 +149,7 @@ export class WasmPcm {
 
         requestAnimationFrame(update);
 
+        unmute(audioContext);
         audioContext.resume();
     }
 }
