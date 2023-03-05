@@ -105,6 +105,8 @@ export class WasmPcm {
 
         
         await audioContext.audioWorklet.addModule('pcm-processor.js');
+
+        unmute(audioContext);
     }
 
     static async start() {
@@ -149,7 +151,6 @@ export class WasmPcm {
 
         requestAnimationFrame(update);
 
-        unmute(audioContext);
         audioContext.resume();
     }
 }
