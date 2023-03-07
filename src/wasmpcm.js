@@ -59,15 +59,15 @@ function pcmProcess() {
 function renderGraphics(canvas) {
     const ctx = canvas.getContext('2d');
 
-    const WIDTH = 320;
-    const HEIGHT = 240;
+    const WIDTH = canvas.width;
+    const HEIGHT = canvas.height;
 
-    const wasmMemoryArray = new Uint8Array(globalInstance.exports.memory.buffer);
-    const gfxBufPtr = globalInstance.exports.getGfxBufPtr();
     const now = getTimeUs();
     globalInstance.exports.update(now/1000 - lastFrameUs/1000);
     lastFrameUs = now;
     globalInstance.exports.renderGfx();
+    const wasmMemoryArray = new Uint8Array(globalInstance.exports.memory.buffer);
+    const gfxBufPtr = globalInstance.exports.getGfxBufPtr();
     var gfxArray = new Uint8ClampedArray(wasmMemoryArray.buffer, gfxBufPtr, WIDTH*HEIGHT*4);
     const imageData = new ImageData(gfxArray, WIDTH, HEIGHT);
     ctx.putImageData(imageData, 0, 0);
@@ -82,8 +82,12 @@ export class WasmPcm {
         return globalInstance;
     }
 
-    static async init(wasmFile) {
-        audioContext = new AudioContext();
+    static async init(wasmFile, sampleRate) {
+        if (sampleRate) {
+            audioContext = new AudioContext({sampleRate:sampleRate});
+        } else {
+            audioContext = new AudioContext();
+        }
 
         // fetch wasm and instantiate
         await fetch(wasmFile).then((response) => {
@@ -130,7 +134,9 @@ export class WasmPcm {
         // attach key handlers
         if (globalInstance.exports.keyevent) {
             document.addEventListener('keydown', (event) => {
-                globalInstance.exports.keyevent(event.keyCode, true);
+                if (!event.repeat) {
+                    globalInstance.exports.keyevent(event.keyCode, true);
+                }
             });
             document.addEventListener('keyup', (event) => {
                 globalInstance.exports.keyevent(event.keyCode, false);

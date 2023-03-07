@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>zig-wasm-audio</title>
+    <style>
+    canvas {
+        width: 640px;
+        height: 400px;
+        image-rendering: crisp-edges;
+        border-style: solid;
+    }
+
+    </style>
+</head>
+
+<script src="coi-serviceworker.js"></script>
+
+<script type="module" defer="true">
+    import { WasmPcm } from "./wasmpcm.js";
+
+    window.addEventListener('load', async () => {
+        await WasmPcm.init('lib/doom.wasm', 22050);
+        const buttonEl = document.getElementById('button-start');
+        buttonEl.disabled = false;
+        buttonEl.addEventListener('click', async () => {
+            await WasmPcm.start();
+
+            buttonEl.style.visibility = 'hidden';
+            let canvasEl = document.getElementById('canvas');
+            canvasEl.style.display = 'block';
+        }, false);
+    });
+
+</script>
+
+<body>
+    <p>
+        <button id="button-start" disabled>START</button>
+        <canvas id="canvas" width=320 height=200 style="display:none">
+    </p>
+    <p>
+        Shareware <a href="https://doomwiki.org/wiki/DOOM1.WAD">doom1.wad</a><br>
+        <a href="https://github.com/ZDoom/gzdoom/blob/master/soundfont/gzdoom.sf2">gzdoom.sf2</a> MIDI SoundFont from <a href="https://github.com/ZDoom/gzdoom">gzdoom</a><br>
+    </p>
+    <p>
+        Cheats: "idkfa" to get all weapons, "iddqd" for god mode, "idclip" to walk through walls)<br>
+        <a href="https://doom.fandom.com/wiki/Doom_Cheat_Codes">More cheat codes</a>
+    </p>
+
+</body>
+
+</html>

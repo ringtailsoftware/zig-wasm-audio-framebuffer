@@ -6,6 +6,8 @@ var rb = null;
 var l = new Float32Array(RENDER_QUANTUM_FRAMES);
 var r = new Float32Array(RENDER_QUANTUM_FRAMES);
 
+var underflowing = false;
+
 class WASMWorkletProcessor extends AudioWorkletProcessor {
     constructor(options) {
 
@@ -17,7 +19,10 @@ class WASMWorkletProcessor extends AudioWorkletProcessor {
         const output = outputs[0];
 
         if (rb.availableRead() < RENDER_QUANTUM_FRAMES * 2) {
-            console.log("UNDERFLOW", rb.availableRead());
+            if (!underflowing) {
+                console.log("UNDERFLOW", rb.availableRead());
+            }
+            underflowing = true;
             return true;
         }
 
@@ -25,6 +30,7 @@ class WASMWorkletProcessor extends AudioWorkletProcessor {
         rb.pop(r, RENDER_QUANTUM_FRAMES);
         output[0].set(l);
         output[1].set(r);
+        underflowing = false;
         return true;
     }
 }
