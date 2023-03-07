@@ -333,6 +333,7 @@ fn keycodeToDoomKey(keycode: u32) pd.doom_key_t {
         90 => return pd.DOOM_KEY_Z,
         8 => return pd.DOOM_KEY_BACKSPACE,
         17 => return pd.DOOM_KEY_CTRL,
+        220 => return pd.DOOM_KEY_CTRL,
         37 => return pd.DOOM_KEY_LEFT_ARROW,
         38 => return pd.DOOM_KEY_UP_ARROW,
         39 => return pd.DOOM_KEY_RIGHT_ARROW,
