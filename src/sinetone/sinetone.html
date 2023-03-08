@@ -13,6 +13,7 @@
     window.addEventListener('load', async () => {
         await WasmPcm.init('lib/sinetone.wasm');
         const buttonEl = document.getElementById('button-start');
+        buttonEl.innerHTML = "Start";
         buttonEl.disabled = false;
         buttonEl.addEventListener('click', async () => {
             await WasmPcm.start();
@@ -45,7 +46,7 @@
 
 <body>
     <p>
-        <button id="button-start" disabled>START</button>
+        <button id="button-start" disabled>Loading</button>
     </p>
     <p>
         Generates independent stereo sine waves
