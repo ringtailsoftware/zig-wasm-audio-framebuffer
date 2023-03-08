@@ -31,6 +31,17 @@
             let canvasEl = document.getElementById('canvas');
             canvasEl.style.display = 'block';
         }, false);
+
+        const fsButtonEl = document.getElementById('fullscreen');
+        fsButtonEl.addEventListener('click', async () => {
+            fsButtonEl.disabled = true;
+            var canvas = document.getElementById('canvas');
+            // scale canvas, maintain aspect-ratio
+            canvas.style.width = window.innerWidth + 'px';
+            canvas.style.height = (window.innerWidth * 0.625) + 'px'
+            document.body.requestFullscreen();
+        }, false);
+
     });
 
 </script>
@@ -39,6 +50,9 @@
     <p>
         <button id="button-start" disabled>Loading</button>
         <canvas id="canvas" width=320 height=200 style="display:none">
+    </p>
+    <p>
+        <button id="fullscreen">Fullscreen</button>
     </p>
     <p>
         Shareware <a href="https://doomwiki.org/wiki/DOOM1.WAD">doom1.wad</a><br>
