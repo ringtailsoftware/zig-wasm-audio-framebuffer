@@ -2,7 +2,7 @@
 
 Toby Jaffey https://mastodon.me.uk/@tobyjaffey
 
-Straighforward examples of integrating Zig and Wasm for audio and video on the web.
+Straighforward examples of integrating Zig and Wasm for audio and graphics on the web.
 
 ## Aims
 
@@ -19,7 +19,7 @@ Visit https://ringtailsoftware.github.io/zig-wasm-audio-framebuffer
  - Sinetone, simple waveform generator
  - Synth, HTML/CSS piano keyboard driving MIDI synth
  - Mod, Pro-Tracker mod player
- - Video, arcade style game skeleton, keyboard control, interactive graphics, background music, sound effects
+ - Bat, arcade style game skeleton, keyboard control, interactive graphics, background music, sound effects
  - Doom, Doom1 Shareware, keyboard control, MIDI music, sound effects
 
 # Build and test

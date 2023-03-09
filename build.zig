@@ -43,7 +43,7 @@ pub fn build(b: *std.build.Builder) void {
     addExample(b, "sinetone", null, null);
     addExample(b, "synth", null, null);
     addExample(b, "mod", &.{"-Wall"}, &.{"src/mod/pocketmod.c"});
-    addExample(b, "video", &.{"-Wall"}, &.{"src/mod/pocketmod.c"});
+    addExample(b, "bat", &.{"-Wall"}, &.{"src/mod/pocketmod.c"});
     addExample(b, "doom", &.{"-Wall", "-fno-sanitize=undefined"}, &.{
         "src/doom/puredoom/DOOM.c",     "src/doom/puredoom/PureDOOM.c", "src/doom/puredoom/am_map.c",
         "src/doom/puredoom/d_items.c",  "src/doom/puredoom/d_main.c",   "src/doom/puredoom/d_net.c",

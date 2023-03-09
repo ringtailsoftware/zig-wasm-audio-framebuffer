@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>zig-wasm-audio</title>
+    <title>bat</title>
     <style>
     canvas {
         width: 320px;
@@ -20,7 +20,7 @@
     import { WasmPcm } from "./wasmpcm.js";
 
     window.addEventListener('load', async () => {
-        await WasmPcm.init('lib/video.wasm');
+        await WasmPcm.init('lib/bat.wasm');
         const buttonEl = document.getElementById('button-start');
         buttonEl.innerHTML = "Start";
         buttonEl.disabled = false;
