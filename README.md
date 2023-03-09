@@ -1,16 +1,26 @@
-# zig-wasm-audio
+# zig-wasm-audio-framebuffer
 
 Toby Jaffey https://mastodon.me.uk/@tobyjaffey
 
-Library code and examples of integrating zig and wasm for audio on the web.
+Straighforward examples of integrating Zig and Wasm for audio and video on the web.
 
-There is a mismatch between low-level audio (found in games, editing tools and music generation) and browser based audio. Games tend to produce PCM sample data in real-time, while browsers provide higher level interfaces allowing playback of short clips or simple synthesis based on oscillators.
+## Aims
 
-Using <a href="https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletNode">AudioWorkletNode</a> it is possible to use raw PCM data directly for playback in browsers. These samples demonstrate doing that.
+ - Cross-platform (running on multiple browsers and operating systems)
+ - Straightforward understandable code. No hidden libraries, no "emscripten magic"
+ - Single thread of execution in Zig, one wasm binary per program
+ - `while(true) { update(); render() }` style
+ - Use existing C libraries to do fun things
 
-# Demo
+# Demos
 
-Visit https://ringtailsoftware.github.io/zig-wasm-audio/
+Visit https://ringtailsoftware.github.io/zig-wasm-audio-framebuffer
+
+ - Sinetone, simple waveform generator
+ - Synth, HTML/CSS piano keyboard driving MIDI synth
+ - Mod, Pro-Tracker mod player
+ - Video, arcade style game skeleton, keyboard control, interactive graphics, background music, sound effects
+ - Doom, Doom1 Shareware, keyboard control, MIDI music, sound effects
 
 # Build and test
 
@@ -19,32 +29,34 @@ Visit https://ringtailsoftware.github.io/zig-wasm-audio/
 
 Browse to http://localhost:8000
 
-# How does it work?
+## Video system
 
-Each sample consists of a small wasm library which exposes functions to setup and render blocks of sound (called "quantum" in WebAudio). Stereo sound is assumed throughout.
+An in-memory 32bpp ARGB framebuffer is created and controlled in Zig. To render onto a canvas element, JavaScript:
 
-Tell wasm what the output sample rate is (e.g. 44100Hz)
+ - Requests the framebuffer Zig/WebAssembly pointer with `getGfxBufPtr()`
+ - Wraps the memory in a `Uint8ClampedArray`
+ - Creates an `ImageData` from the `Uint8ClampedArray`
+ - Shows the `ImageData` in canvas's graphics context
 
-    export fn setSampleRate(s:f32) void
+## Audio pipeline
 
-Fetch a pointer to the left or right channel data
+An <a href="https://developer.mozilla.org/en-US/docs/Web/API/AudioWorkletNode">AudioWorkletNode</a> is used to move PCM samples from WebAssembly to the audio output device.
 
-    export fn getLeftBufPtr() [*]u8
-    export fn getRightBufPtr() [*]u8
+The system is hardcoded to 2 channels (stereo) and uses 32-bit floats for audio data throughout. In-memory arrays of audio data are created and controlled in Zig.
 
-Request wasm library renders a single quantum (128 samples) into the left and right channels
+The AudioWorkletNode expects to pull chunks of audio to be rendered on-demand. However, being isolated from the main thread it cannot directly communicate with the main Wasm program. This is solved by using a <a href="https://github.com/padenot/ringbuf.js/">shared ringbuffer</a>. To render audio to the output device, JavaScript:
 
-    export fn renderSoundQuantum();
+ - Tells Zig/WebAssembly the expected sample rate in Hz for the output device, `setSampleRate(44100)`
+ - Forever, checks if the ringbuffer has space for more data
+ - Tells Zig/WebAssembly to fill its audio buffers with `renderSoundQuantum()`
+ - Fetches pointers to the left and right channels using `getLeftBufPtr()` `getRightBufPtr()`
+ - Copies from left and right channels into the ringbuffer
 
-The `WasmPcm` (`wasmpcm.js`) class creates an AudioWorkletNode WASMWorkletProcessor using `pcm-processor.js`. At regular intervals `WasmPcm` calls `pcmProcess()` to request audio data from wasm (`renderSoundQuantum()`). This data is written to a shared ringbuffer. In the worklet, the ringbuffer is consumed and samples are written out.
-
-## The ringbuffer
-
-The ringbuffer used is <a href="https://github.com/padenot/ringbuf.js/">ringbuf.js</a> which provides a "thread-safe wait-free single-consumer single-producer ring buffer" backed by a SharedArrayBuffer.
+The `WasmPcm` (`wasmpcm.js`) class creates the `AudioWorkletNode` `WASMWorkletProcessor` using `pcm-processor.js`. At regular intervals `WasmPcm` calls `pcmProcess()` to request audio data from Wasm.
 
 # Compatibility
 
-Tested on Safari/Chrome/Firefox on MacOS, Safari on iOS.
+Tested on Safari/Chrome/Firefox on macOS, Safari on iPhone SE2/iPad, Chrome/Android Galaxy Tablet
 
 # iOS unmute
 
@@ -57,5 +69,5 @@ To share data between the main thread and the worklet, SharedArrayBuffer is used
     Cross-Origin-Opener-Policy: same-origin
     Cross-Origin-Embedder-Policy: require-corp
 
-However, this is worked around by using <a href="https://github.com/gzuidhof/coi-serviceworker">coi-serviceworker</a>
+However, this is worked around by using <a href="https://github.com/gzuidhof/coi-serviceworker">coi-serviceworker</a> which reloads the page on startup.
 
