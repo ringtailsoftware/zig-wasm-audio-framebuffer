@@ -75,4 +75,5 @@ pub fn build(b: *std.build.Builder) void {
         "src/tinygl/TinyGL/include", "src/tinygl/TinyGL/src",
     });
 
+    addExample(b, "mandelbrot", null, null, null);
 }

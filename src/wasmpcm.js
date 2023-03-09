@@ -32,6 +32,13 @@ function console_write(dataPtr, len) {
     }
 }
 
+function getCursorPosition(canvas, event) {
+    const rect = canvas.getBoundingClientRect()
+    const x = event.clientX - rect.left;
+    const y = event.clientY - rect.top;
+    return {x: x, y: y};
+}
+
 function pcmProcess() {
     const wasmMemoryArray = new Uint8Array(globalInstance.exports.memory.buffer);
     const leftBufPtr = globalInstance.exports.getLeftBufPtr();
@@ -141,6 +148,25 @@ export class WasmPcm {
             document.addEventListener('keyup', (event) => {
                 globalInstance.exports.keyevent(event.keyCode, false);
             });
+        }
+
+        // attach mouse handlers
+        let canvasEl = document.getElementById('canvas');
+        if (canvasEl) {
+            if (globalInstance.exports.mouseClickEvent) {
+                canvas.addEventListener('mousedown', (event) => {
+                    event = getCursorPosition(canvasEl, event);
+                    globalInstance.exports.mouseClickEvent(event.x, event.y, true);
+                });
+                canvas.addEventListener('mouseup', (event) => {
+                    event = getCursorPosition(canvasEl, event);
+                    globalInstance.exports.mouseClickEvent(event.x, event.y, false);
+                });
+                canvas.addEventListener('mousemove', (event) => {
+                    event = getCursorPosition(canvasEl, event);
+                    globalInstance.exports.mouseMoveEvent(event.x, event.y);
+                });
+            }
         }
 
         const update = () => {

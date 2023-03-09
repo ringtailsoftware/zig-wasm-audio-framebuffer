@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>mandelbrot</title>
+    <style>
+    canvas {
+        width: 1200px;
+        height: 800px;
+        image-rendering: crisp-edges;
+        border-style: solid;
+    }
+
+    </style>
+</head>
+
+<script src="coi-serviceworker.js"></script>
+
+<script type="module" defer="true">
+    import { WasmPcm } from "./wasmpcm.js";
+
+    window.addEventListener('load', async () => {
+        await WasmPcm.init('lib/mandelbrot.wasm');
+        const buttonEl = document.getElementById('button-start');
+        buttonEl.innerHTML = "Start";
+        buttonEl.disabled = false;
+        buttonEl.addEventListener('click', async () => {
+            await WasmPcm.start();
+
+            buttonEl.style.visibility = 'hidden';
+            let canvasEl = document.getElementById('canvas');
+            canvasEl.style.display = 'block';
+        }, false);
+    });
+
+</script>
+
+<body>
+    <p>
+        <button id="button-start" disabled>Loading</button>
+        <canvas id="canvas" width=1200 height=800 style="display:none">
+    </p>
+    <p>
+        Escape function from <a href="https://github.com/andrewrk/zig-mandelbrot-gl">mandelbrot-gl</a>
+    </p>
+    <p>
+        Click and drag the mouse to select an area to zoom.
+    </p>
+
+<hr><a href="https://github.com/ringtailsoftware/zig-wasm-audio-framebuffer/">https://github.com/ringtailsoftware/zig-wasm-audio-framebuffer/</a>
+</body>
+
+</html>
