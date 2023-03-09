@@ -2,12 +2,12 @@
 
 Toby Jaffey https://mastodon.me.uk/@tobyjaffey
 
-Straighforward examples of integrating Zig and Wasm for audio and graphics on the web.
+Straightforward examples of integrating Zig and Wasm for audio and graphics on the web.
 
 ## Aims
 
  - Cross-platform (running on multiple browsers and operating systems)
- - Straightforward understandable code. No hidden libraries, no "emscripten magic"
+ - Simple understandable code. No hidden libraries, no "emscripten magic"
  - Single thread of execution in Zig, one wasm binary per program
  - `while(true) { update(); render() }` style
  - Use existing C libraries to do fun things
