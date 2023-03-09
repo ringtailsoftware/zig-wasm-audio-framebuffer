@@ -19,6 +19,7 @@ Visit https://ringtailsoftware.github.io/zig-wasm-audio-framebuffer
  - Sinetone, simple waveform generator
  - Synth, HTML/CSS piano keyboard driving MIDI synth
  - Mod, Pro-Tracker mod player
+ - Mandelbrot, mandelbrot set, mouse interaction
  - Bat, arcade style game skeleton, keyboard control, interactive graphics, background music, sound effects
  - Doom, Doom1 Shareware, keyboard control, MIDI music, sound effects
  - TinyGL, software GL renderer in Wasm
