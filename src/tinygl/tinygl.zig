@@ -235,10 +235,6 @@ pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize)
 extern fn getTimeUs() u32;
 
 // implement a backend for tgl
-export fn doom_print_impl(msg: [*:0]const u8) callconv(.C) void {
-    _ = console.print("{s}", .{std.mem.span(msg)}) catch 0;
-}
-
 export fn gl_malloc(size: c_int) callconv(.C) ?[*]u8 {
     var mem = allocator.alloc(u8, @intCast(usize, size + @sizeOf(usize))) catch {
         _ = console.print("ALLOCFAIL", .{}) catch 0;
