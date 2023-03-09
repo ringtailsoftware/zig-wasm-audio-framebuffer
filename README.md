@@ -21,6 +21,7 @@ Visit https://ringtailsoftware.github.io/zig-wasm-audio-framebuffer
  - Mod, Pro-Tracker mod player
  - Bat, arcade style game skeleton, keyboard control, interactive graphics, background music, sound effects
  - Doom, Doom1 Shareware, keyboard control, MIDI music, sound effects
+ - TinyGL, software GL renderer in Wasm
 
 # Build and test
 

@@ -1,6 +1,6 @@
 const std = @import("std");
 
-fn addExample(b: *std.build.Builder, comptime name: []const u8, flags: ?[]const []const u8, sources: ?[]const []const u8) void {
+fn addExample(b: *std.build.Builder, comptime name: []const u8, flags: ?[]const []const u8, sources: ?[]const []const u8, includes: ?[]const []const u8) void {
     const mode = b.standardReleaseOptions();
     const lib = b.addSharedLibrary(name, "src/" ++ name ++ "/" ++ name ++ ".zig", .unversioned);
     lib.setTarget(.{ .cpu_arch = .wasm32, .os_tag = .freestanding });
@@ -10,27 +10,17 @@ fn addExample(b: *std.build.Builder, comptime name: []const u8, flags: ?[]const 
     lib.install();
     lib.addIncludePath("src/" ++ name);
 
+    if (includes != null) {
+        for (includes.?) |inc| {
+            lib.addIncludePath(inc);
+        }
+    }
     if (flags != null and sources != null) {
         lib.addCSourceFiles(sources.?, flags.?);
     }
 
     b.installFile("src/" ++ name ++ "/" ++ name ++ ".html", name ++ ".html");
 }
-
-//fn addNativeDebugExample(b: *std.build.Builder, comptime name: []const u8, flags: ?[]const []const u8, sources: ?[]const []const u8) void {
-//    const target = b.standardTargetOptions(.{});
-//    const mode = b.standardReleaseOptions();
-//    const exe = b.addExecutable(name, "src/" ++ name ++ "/" ++ name ++ ".zig");
-//    exe.setTarget(target);
-//    exe.setBuildMode(mode);
-//    exe.strip = false;
-//    exe.install();
-//    exe.addIncludePath("src/" ++ name);
-//
-//    if (flags != null and sources != null) {
-//        exe.addCSourceFiles(sources.?, flags.?);
-//    }
-//}
 
 pub fn build(b: *std.build.Builder) void {
     b.installFile("src/index.html", "index.html");
@@ -40,10 +30,14 @@ pub fn build(b: *std.build.Builder) void {
     b.installFile("src/coi-serviceworker.js", "coi-serviceworker.js");
     b.installFile("src/unmute.js", "unmute.js");
 
-    addExample(b, "sinetone", null, null);
-    addExample(b, "synth", null, null);
-    addExample(b, "mod", &.{"-Wall"}, &.{"src/mod/pocketmod.c"});
-    addExample(b, "bat", &.{"-Wall"}, &.{"src/mod/pocketmod.c"});
+    addExample(b, "sinetone", null, null, null);
+
+    addExample(b, "synth", null, null, null);
+
+    addExample(b, "mod", &.{"-Wall"}, &.{"src/mod/pocketmod.c"}, null);
+
+    addExample(b, "bat", &.{"-Wall"}, &.{"src/mod/pocketmod.c"}, null);
+
     addExample(b, "doom", &.{"-Wall", "-fno-sanitize=undefined"}, &.{
         "src/doom/puredoom/DOOM.c",     "src/doom/puredoom/PureDOOM.c", "src/doom/puredoom/am_map.c",
         "src/doom/puredoom/d_items.c",  "src/doom/puredoom/d_main.c",   "src/doom/puredoom/d_net.c",
@@ -66,5 +60,19 @@ pub fn build(b: *std.build.Builder) void {
         "src/doom/puredoom/s_sound.c",  "src/doom/puredoom/sounds.c",   "src/doom/puredoom/st_lib.c",
         "src/doom/puredoom/st_stuff.c", "src/doom/puredoom/tables.c",   "src/doom/puredoom/v_video.c",
         "src/doom/puredoom/w_wad.c",    "src/doom/puredoom/wi_stuff.c", "src/doom/puredoom/z_zone.c",
+    }, null);
+
+    addExample(b, "tinygl", &.{"-Wall", "-fno-sanitize=undefined"}, &.{
+        "src/tinygl/TinyGL/src/api.c", "src/tinygl/TinyGL/src/specbuf.c", "src/tinygl/TinyGL/src/zmath.c",
+        "src/tinygl/TinyGL/src/arrays.c", "src/tinygl/TinyGL/src/image_util.c", "src/tinygl/TinyGL/src/misc.c",
+        "src/tinygl/TinyGL/src/texture.c", "src/tinygl/TinyGL/src/ztriangle.c", "src/tinygl/TinyGL/src/clear.c",
+        "src/tinygl/TinyGL/src/init.c", "src/tinygl/TinyGL/src/msghandling.c", "src/tinygl/TinyGL/src/vertex.c",
+        "src/tinygl/TinyGL/src/clip.c", "src/tinygl/TinyGL/src/light.c", "src/tinygl/TinyGL/src/zbuffer.c",
+        "src/tinygl/TinyGL/src/error.c", "src/tinygl/TinyGL/src/list.c", "src/tinygl/TinyGL/src/zdither.c",
+        "src/tinygl/TinyGL/src/get.c", "src/tinygl/TinyGL/src/matrix.c", "src/tinygl/TinyGL/src/select.c",
+        "src/tinygl/TinyGL/src/zline.c",
+    }, &.{
+        "src/tinygl/TinyGL/include", "src/tinygl/TinyGL/src",
     });
+
 }

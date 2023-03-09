@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>tinygl</title>
+    <style>
+    canvas {
+        width: 400px;
+        height: 400px;
+        image-rendering: crisp-edges;
+        border-style: solid;
+    }
+
+    </style>
+</head>
+
+<script src="coi-serviceworker.js"></script>
+
+<script type="module" defer="true">
+    import { WasmPcm } from "./wasmpcm.js";
+
+    window.addEventListener('load', async () => {
+        await WasmPcm.init('lib/tinygl.wasm');
+        const buttonEl = document.getElementById('button-start');
+        buttonEl.innerHTML = "Start";
+        buttonEl.disabled = false;
+        buttonEl.addEventListener('click', async () => {
+            await WasmPcm.start();
+
+            buttonEl.style.visibility = 'hidden';
+            let canvasEl = document.getElementById('canvas');
+            canvasEl.style.display = 'block';
+        }, false);
+    });
+
+</script>
+
+<body>
+    <p>
+        <button id="button-start" disabled>Loading</button>
+        <canvas id="canvas" width=200 height=200 style="display:none">
+    </p>
+    <p>
+        <a href="https://bellard.org/TinyGL/">TinyGL</a> portable software GL renderer. Cursor keys to rotate
+    </p>
+
+<hr><a href="https://github.com/ringtailsoftware/zig-wasm-audio-framebuffer/">https://github.com/ringtailsoftware/zig-wasm-audio-framebuffer/</a>
+</body>
+
+</html>
