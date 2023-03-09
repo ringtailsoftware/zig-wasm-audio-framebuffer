@@ -6,8 +6,8 @@ const tgl = @cImport({
     @cInclude("zgl.h");
 });
 
-const WIDTH = 200;
-const HEIGHT = 200;
+const WIDTH = 400;
+const HEIGHT = 400;
 var gfxFramebuffer: [WIDTH * HEIGHT]u32 = undefined;
 
 const RENDER_QUANTUM_FRAMES = 128; // WebAudio's render quantum size
