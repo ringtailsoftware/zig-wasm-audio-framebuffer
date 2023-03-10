@@ -1,20 +1,27 @@
-on: 
-  schedule:
-  - cron: "0 0 * * *"
-  push:
-    branches:
-      - master
-  pull_request:
-    branches:
-      - master
-name: Build 
+name: CI
+
+on: [push, pull_request]
+
 jobs:
-  build:
-    name: Build
-    runs-on: ubuntu-latest
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{matrix.os}}
     steps:
-    - name: Check out code
-      uses: actions/checkout@v2
-    - name: Build
-      run: docker build -t zig-wasm-audio-framebuffer . && docker run -t --rm zig-wasm-audio-framebuffer zig build
+      - name: Checkout zigmimg
+        uses: actions/checkout@v2
+        with:
+          path: zig-wasm-audio-framebuffer
+      - name: Setup Zig
+        uses: goto-bus-stop/setup-zig@v1
+        with:
+          version: master
+      - name: AST Verify
+        run: zig fmt --check --ast-check src/
+        working-directory: zig-wasm-audio-framebuffer
+      - name: Build
+        run: zig build
+        working-directory: zig-wasm-audio-framebuffer
+
 
