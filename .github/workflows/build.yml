@@ -14,5 +14,5 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v2
     - name: Build
-      run: docker build -t zig-wasm-audio-framebuffer .
+      run: docker build -t zig-wasm-audio-framebuffer . && docker run -t --rm zig-wasm-audio-framebuffer zig build
 
