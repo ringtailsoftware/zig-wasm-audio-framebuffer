@@ -1,11 +1,18 @@
 const std = @import("std");
 
+var target: std.zig.CrossTarget = undefined;
+var optimize: std.builtin.Mode = undefined;
+
+
 fn addExample(b: *std.build.Builder, comptime name: []const u8, flags: ?[]const []const u8, sources: ?[]const []const u8, includes: ?[]const []const u8) void {
-    const mode = b.standardReleaseOptions();
-    const lib = b.addSharedLibrary(name, "src/" ++ name ++ "/" ++ name ++ ".zig", .unversioned);
-    lib.setTarget(.{ .cpu_arch = .wasm32, .os_tag = .freestanding });
+    const lib = b.addSharedLibrary(.{
+        .name = name,
+        .root_source_file = .{ .path = "src/" ++ name ++ "/" ++ name ++ ".zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+
     lib.rdynamic = true;
-    lib.setBuildMode(mode);
     lib.strip = false;
     lib.install();
     lib.addIncludePath("src/" ++ name);
@@ -23,6 +30,12 @@ fn addExample(b: *std.build.Builder, comptime name: []const u8, flags: ?[]const 
 }
 
 pub fn build(b: *std.build.Builder) void {
+    target = b.standardTargetOptions(.{ .default_target = .{
+        .cpu_arch = .wasm32,
+        .os_tag = .freestanding,
+    } });
+    optimize = b.standardOptimizeOption(.{});
+
     b.installFile("src/index.html", "index.html");
     b.installFile("src/pcm-processor.js", "pcm-processor.js");
     b.installFile("src/wasmpcm.js", "wasmpcm.js");
