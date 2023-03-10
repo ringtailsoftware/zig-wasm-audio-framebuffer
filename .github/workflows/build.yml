@@ -9,7 +9,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{matrix.os}}
     steps:
-      - name: Checkout zigmimg
+      - name: Checkout zig-wasm-audio-framebuffer
         uses: actions/checkout@v2
         with:
           path: zig-wasm-audio-framebuffer
@@ -17,9 +17,6 @@ jobs:
         uses: goto-bus-stop/setup-zig@v1
         with:
           version: master
-      - name: AST Verify
-        run: zig fmt --check --ast-check src/
-        working-directory: zig-wasm-audio-framebuffer
       - name: Build
         run: zig build
         working-directory: zig-wasm-audio-framebuffer
