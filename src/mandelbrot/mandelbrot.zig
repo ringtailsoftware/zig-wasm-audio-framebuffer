@@ -14,7 +14,7 @@ var mix_right: [RENDER_QUANTUM_FRAMES]f32 = undefined;
 
 var startTime: u32 = 0;
 
-const MAX_ITERATIONS = 2048;
+const MAX_ITERATIONS = 256;
 
 pub const std_options = struct {
     pub fn logFn(
