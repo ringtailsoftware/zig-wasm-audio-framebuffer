@@ -24,10 +24,14 @@ Visit https://ringtailsoftware.github.io/zig-wasm-audio-framebuffer
  - Doom, Doom1 Shareware, keyboard control, MIDI music, sound effects
  - TinyGL, software GL renderer in Wasm
 
-# Build and test
+# Build and test (assumes you have zig installed)
 
     zig build
     cd zig-out && python3 -m http.server 8000
+
+# Build and test via docker
+
+    make
 
 Browse to http://localhost:8000
 
