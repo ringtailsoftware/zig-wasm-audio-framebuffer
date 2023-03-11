@@ -1,20 +1,13 @@
 const std = @import("std");
 const console = @import("console.zig").getWriter().writer();
-
 const spriteData = @embedFile("zero64.raw");
-
-const olive = @cImport({
-    @cInclude("olive.c/olive.h");
-});
+const math = @import("zlm.zig");
+const Vec2 = math.Vec2;
+const vec2 = math.vec2;
 
 const WIDTH = 400;
 const HEIGHT = 400;
 var gfxFramebuffer: [WIDTH * HEIGHT]u32 = undefined;
-
-var oc:olive.Olivec_Canvas = undefined;
-
-var sprBuf: [64*64]u32 = undefined;
-var spriteOc:olive.Olivec_Canvas = undefined;
 
 const RENDER_QUANTUM_FRAMES = 128; // WebAudio's render quantum size
 var sampleRate: f32 = 44100;
@@ -27,45 +20,46 @@ var prng = std.rand.DefaultPrng.init(0);
 var rand = prng.random();
 
 const NUMBALLS = 1000;
-var balls:[NUMBALLS]Ball = undefined;
+var balls: [NUMBALLS]Ball = undefined;
 
+const Renderer = @import("renderer.zig").Renderer;
+const Surface = @import("renderer.zig").Surface;
+
+var gSurface: Surface = undefined; //Surface.init(&gfxFramebuffer, WIDTH, HEIGHT);
+var gRenderer: Renderer = undefined; //Renderer.init(&gSurface);
+var sprBuf: [64 * 64]u32 = undefined;
+var spriteSurface: Surface = undefined; //Surface.init(sprBuf, 64, 64);
 
 const Ball = struct {
     const Self = @This();
-    x:f32,
-    y:f32,
-    xd:f32,
-    yd:f32,
-    r:i32,
-    colour:u32,
+    pos: Vec2,
+    vel: Vec2,
+    r: i32,
+    colour: u32,
 
-    pub fn init(x:f32, y:f32, xd:f32, yd:f32, r:i32, colour:u32) Self {
+    pub fn init(pos: Vec2, vel: Vec2, r: i32, colour: u32) Self {
         return Self{
-            .x=x,
-            .y=y,
-            .xd=xd,
-            .yd=yd,
-            .r=r,
-            .colour=colour,
+            .pos = pos,
+            .vel = vel,
+            .r = r,
+            .colour = colour,
         };
     }
 
-    pub fn step(self:*Self) void {
-        self.x += self.xd;
-        self.y += self.yd;
-        if (self.x < 0 or self.x > WIDTH) {
-            self.xd = -self.xd;
+    pub fn step(self: *Self) void {
+        self.pos = self.pos.add(self.vel);
+        if (self.pos.x < 0 or self.pos.x > WIDTH) {
+            self.vel.x = -self.vel.x;
         }
-        if (self.y < 0 or self.y > HEIGHT) {
-            self.yd = -self.yd;
+        if (self.pos.y < 0 or self.pos.y > HEIGHT) {
+            self.vel.y = -self.vel.y;
         }
     }
 
-    pub fn render(self:*const Self, ctx:olive.Olivec_Canvas) void {
-        olive.olivec_sprite_blend(ctx, @floatToInt(i32, self.x), @floatToInt(i32, self.y), 64, 64, spriteOc);
+    pub fn render(self: *const Self, renderer: *Renderer) void {
+        renderer.sprite_blend(&spriteSurface, @floatToInt(i32, self.pos.x), @floatToInt(i32, self.pos.y), 64, 64);
     }
 };
-
 
 pub const std_options = struct {
     pub fn logFn(
@@ -118,46 +112,42 @@ export fn getRightBufPtr() [*]u8 {
 export fn renderSoundQuantum() void {}
 
 fn randColour() u32 {
-    const r8:u8 = rand.int(u8);
-    const g8:u8 = rand.int(u8);
-    const b8:u8 = rand.int(u8);
-    return 0xFF000000 | @as(u32,b8)<<16 | @as(u32,g8) << 8 | @as(u32,r8);
+    const r8: u8 = rand.int(u8);
+    const g8: u8 = rand.int(u8);
+    const b8: u8 = rand.int(u8);
+    return 0xFF000000 | @as(u32, b8) << 16 | @as(u32, g8) << 8 | @as(u32, r8);
 }
 
 export fn init() void {
     startTime = getTimeUs();
     frameCount = 0;
 
-    oc = olive.olivec_canvas(&gfxFramebuffer, WIDTH, HEIGHT, WIDTH);
-    olive.olivec_fill(oc, 0xFF000000);
+    gSurface = Surface.init(&gfxFramebuffer, WIDTH, HEIGHT);
+    gRenderer = Renderer.init(&gSurface);
 
     std.mem.copy(u32, &sprBuf, std.mem.bytesAsSlice(u32, @alignCast(4, spriteData)));
-    spriteOc = olive.olivec_canvas(&sprBuf, 64, 64, 64);
+    spriteSurface = Surface.init(&sprBuf, 64, 64);
+
+    gRenderer.fill(0xFF000000);
 
     for (&balls) |*ball| {
-        ball.* = Ball.init(
-            rand.float(f32) * @as(f32,WIDTH),
-            rand.float(f32) * @as(f32,HEIGHT),
-            rand.float(f32)*4 - 2,
-            rand.float(f32)*4 - 2,
-            @floatToInt(i32, (rand.float(f32)*10 + 2)),
-            randColour());
+        ball.* = Ball.init(vec2(rand.float(f32) * @as(f32, WIDTH), rand.float(f32) * @as(f32, HEIGHT)), vec2(rand.float(f32) * 4 - 2, rand.float(f32) * 4 - 2), @floatToInt(i32, (rand.float(f32) * 10 + 2)), randColour());
     }
 }
 
 export fn update(deltaMs: u32) void {
     _ = deltaMs;
 
-    olive.olivec_fill(oc, 0xFF000000);  // black background
-    olive.olivec_circle(oc, WIDTH/2, HEIGHT/2, WIDTH/2, 0xFF0000FF);   // big red circle
+    gRenderer.fill(0xFF000000); // black background
+    gRenderer.circle(WIDTH / 2, HEIGHT / 2, WIDTH / 2, 0xFF0000FF); // big red circle
 
     for (&balls) |*ball| {
         ball.step();
-        ball.render(oc);
+        ball.render(&gRenderer);
     }
-    var buf:[16:0]u8 = undefined;
-    _ = std.fmt.bufPrintZ(&buf, "{d}", .{lastFPS}) catch 0;
-    olive.olivec_text(oc, &buf, 0, 0, olive.olivec_default_font, 2, 0xFFFFFFFF);
+    var buf: [16]u8 = undefined;
+    _ = std.fmt.bufPrint(&buf, "{d}", .{lastFPS}) catch 0;
+    gRenderer.text(0, 0, &buf);
 }
 
 var lastTime: u32 = 0;
@@ -178,4 +168,3 @@ fn printFPS() void {
 export fn renderGfx() void {
     printFPS();
 }
-
