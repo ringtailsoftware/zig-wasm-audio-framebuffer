@@ -23,6 +23,7 @@ Visit https://ringtailsoftware.github.io/zig-wasm-audio-framebuffer
  - Bat, arcade style game skeleton, keyboard control, interactive graphics, background music, sound effects
  - Doom, Doom1 Shareware, keyboard control, MIDI music, sound effects
  - TinyGL, software GL renderer in Wasm
+ - OliveC, graphics library with sprite blit, circle, rectangle, line, etc.
 
 # Build and test (assumes you have zig installed)
 
