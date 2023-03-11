@@ -205,9 +205,9 @@ export fn renderSoundQuantum() void {
     while (i < RENDER_QUANTUM_FRAMES) : (i += 2) {
         // double up audio samples as doom produces at 11025, but webaudio will only go down to 22050
         mix_left[i] = fx_volume * @intToFloat(f32, doomSndBuf[i + (audioBlockIndex * 64)]) / 32768.0;
-        mix_left[i+1] = fx_volume * @intToFloat(f32, doomSndBuf[i + (audioBlockIndex * 64)]) / 32768.0;
+        mix_left[i + 1] = fx_volume * @intToFloat(f32, doomSndBuf[i + (audioBlockIndex * 64)]) / 32768.0;
         mix_right[i] = fx_volume * @intToFloat(f32, doomSndBuf[i + (audioBlockIndex * 2 * 64)]) / 32768.0;
-        mix_right[i+1] = fx_volume * @intToFloat(f32, doomSndBuf[i + (audioBlockIndex * 2 * 64)]) / 32768.0;
+        mix_right[i + 1] = fx_volume * @intToFloat(f32, doomSndBuf[i + (audioBlockIndex * 2 * 64)]) / 32768.0;
     }
 
     i = 0;

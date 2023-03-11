@@ -32,7 +32,6 @@ var red: [4]tgl.GLfloat = .{ 0.8, 0.1, 0.0, 1.0 };
 var green: [4]tgl.GLfloat = .{ 0.0, 0.8, 0.2, 1.0 };
 var blue: [4]tgl.GLfloat = .{ 0.2, 0.2, 1.0, 1.0 };
 
-
 fn gear(inner_radius: tgl.GLfloat, outer_radius: tgl.GLfloat, width: tgl.GLfloat, teeth: tgl.GLint, tooth_depth: tgl.GLfloat) void {
     var i: tgl.GLint = undefined;
     var r0: tgl.GLfloat = undefined;
@@ -414,4 +413,3 @@ export fn renderGfx() void {
 
     printFPS();
 }
-

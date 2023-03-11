@@ -1,7 +1,7 @@
 const std = @import("std");
 var cw = ConsoleWriter{};
 
-extern fn console_write(data:[*]const u8, len:usize) void;
+extern fn console_write(data: [*]const u8, len: usize) void;
 //fn console_write(data:[*]const u8, len:usize) void {
 //    std.log.info("{s}", .{data[0..len]});
 //}

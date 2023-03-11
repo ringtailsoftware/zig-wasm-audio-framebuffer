@@ -57,25 +57,25 @@ var zoom = ZoomBox{
     .bottom = -1.0,
 };
 
-var inDrag:bool = false;
-var x1:f32 = 0;
-var y1:f32 = 0;
-var x2:f32 = 0;
-var y2:f32 = 0;
+var inDrag: bool = false;
+var x1: f32 = 0;
+var y1: f32 = 0;
+var x2: f32 = 0;
+var y2: f32 = 0;
 
-export fn mouseMoveEvent(x:f32, y:f32) void {
+export fn mouseMoveEvent(x: f32, y: f32) void {
     if (inDrag) {
         x2 = x;
         _ = y;
         //y2 = y;
         // force fixed aspect-ratio
-        y2 = y1 + (x2-x1)*(@as(f32, HEIGHT)/@as(f32, WIDTH));
+        y2 = y1 + (x2 - x1) * (@as(f32, HEIGHT) / @as(f32, WIDTH));
 
         //redraw();
     }
 }
 
-export fn mouseClickEvent(x:f32, y:f32, down:bool) void {
+export fn mouseClickEvent(x: f32, y: f32, down: bool) void {
     //_ = console.print("mouse {d},{d} {?} inDrag={?}\n", .{x, y, down, inDrag}) catch 0;
 
     if (down) {
@@ -92,7 +92,7 @@ export fn mouseClickEvent(x:f32, y:f32, down:bool) void {
             x2 = x;
             //y2 = y;
             // force fixed aspect-ratio
-            y2 = y1 + (x2-x1)*(@as(f32, HEIGHT)/@as(f32, WIDTH));
+            y2 = y1 + (x2 - x1) * (@as(f32, HEIGHT) / @as(f32, WIDTH));
 
             inDrag = false;
 
@@ -165,7 +165,7 @@ fn printFPS() void {
     lastTime = millis();
 }
 
-fn fillRect(xpos:i32, ypos:i32, width:i32, height:i32, colour:u32) void {
+fn fillRect(xpos: i32, ypos: i32, width: i32, height: i32, colour: u32) void {
     var x = xpos;
     var y = ypos;
     var w = width;
@@ -175,7 +175,7 @@ fn fillRect(xpos:i32, ypos:i32, width:i32, height:i32, colour:u32) void {
         x = 0;
     }
     if (x >= WIDTH) {
-        x = WIDTH-1;
+        x = WIDTH - 1;
     }
     if (x + w >= WIDTH) {
         w = WIDTH - x;
@@ -185,7 +185,7 @@ fn fillRect(xpos:i32, ypos:i32, width:i32, height:i32, colour:u32) void {
         y = 0;
     }
     if (y >= HEIGHT) {
-        y = HEIGHT-1;
+        y = HEIGHT - 1;
     }
     if (y + h >= HEIGHT) {
         h = HEIGHT - y;
@@ -194,9 +194,9 @@ fn fillRect(xpos:i32, ypos:i32, width:i32, height:i32, colour:u32) void {
     const x2a = x + w;
     const y2a = y + h;
 
-    while(y < y2a) : (y += 1) {
+    while (y < y2a) : (y += 1) {
         var xi = x;
-        while(xi < x2a) : (xi += 1) {
+        while (xi < x2a) : (xi += 1) {
             gfxFramebuffer[@intCast(usize, y) * WIDTH + @intCast(usize, xi)] = colour;
         }
     }
@@ -231,17 +231,16 @@ fn redraw() void {
             } else false;
 
             if (escaped) {
-                const r8:u8 = 0;
-                const g8:u8 = @intCast(u8, iterations);
-                const b8:u8 = 255 - @intCast(u8, iterations);
-                renderBuffer[pix_y * WIDTH + pix_x] = 0xFF000000 | @as(u32,b8)<<16 | @as(u32,g8) << 8 | @as(u32,r8);
+                const r8: u8 = 0;
+                const g8: u8 = @intCast(u8, iterations);
+                const b8: u8 = 255 - @intCast(u8, iterations);
+                renderBuffer[pix_y * WIDTH + pix_x] = 0xFF000000 | @as(u32, b8) << 16 | @as(u32, g8) << 8 | @as(u32, r8);
             } else {
                 renderBuffer[pix_y * WIDTH + pix_x] = 0xFF000000;
             }
         }
     }
 }
-
 
 export fn renderGfx() void {
     printFPS();
@@ -257,4 +256,3 @@ export fn renderGfx() void {
         fillRect(@floatToInt(i32, start_pix_x), @floatToInt(i32, start_pix_y), @floatToInt(i32, end_pix_x - start_pix_x), @floatToInt(i32, end_pix_y - start_pix_y), 0xFF808080);
     }
 }
-

@@ -1,7 +1,7 @@
 const std = @import("std");
 var cw = ConsoleWriter{};
 
-extern fn console_write(data:[*]const u8, len:usize) void;
+extern fn console_write(data: [*]const u8, len: usize) void;
 
 // Implement a std.io.Writer backed by console_write()
 const ConsoleWriter = struct {
