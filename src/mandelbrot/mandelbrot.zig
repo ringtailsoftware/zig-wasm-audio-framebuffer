@@ -44,10 +44,10 @@ pub fn millis() u32 {
 }
 
 const ZoomBox = struct {
-    left: f32,
-    top: f32,
-    right: f32,
-    bottom: f32,
+    left: f64,
+    top: f64,
+    right: f64,
+    bottom: f64,
 };
 
 var zoom = ZoomBox{
