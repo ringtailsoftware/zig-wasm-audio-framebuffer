@@ -16,11 +16,11 @@ export fn setSampleRate(s: f32) void {
 }
 
 export fn getLeftBufPtr() [*]u8 {
-    return @ptrCast([*]u8, &left);
+    return @ptrCast(&left);
 }
 
 export fn getRightBufPtr() [*]u8 {
-    return @ptrCast([*]u8, &right);
+    return @ptrCast(&right);
 }
 
 export fn setLeftFreq(f: f32) void {
@@ -34,8 +34,8 @@ export fn setRightFreq(f: f32) void {
 export fn renderSoundQuantum() void {
     var i: usize = 0;
     while (i < RENDER_QUANTUM_FRAMES) : (i += 1) {
-        left[i] = std.math.sin(2 * std.math.pi * l_freqHz * @intToFloat(f32, frameCounter) / sampleRate);
-        right[i] = std.math.sin(2 * std.math.pi * r_freqHz * @intToFloat(f32, frameCounter) / sampleRate);
+        left[i] = std.math.sin(2 * std.math.pi * l_freqHz * @as(f32, @floatFromInt(frameCounter)) / sampleRate);
+        right[i] = std.math.sin(2 * std.math.pi * r_freqHz * @as(f32, @floatFromInt(frameCounter)) / sampleRate);
         frameCounter += 1;
     }
 }

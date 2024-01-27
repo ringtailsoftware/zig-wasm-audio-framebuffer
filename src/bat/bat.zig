@@ -117,7 +117,7 @@ export fn keyevent(keycode: u32, down: bool) void {
 }
 
 export fn getGfxBufPtr() [*]u8 {
-    return @ptrCast([*]u8, &gfxFramebuffer);
+    return @ptrCast(&gfxFramebuffer);
 }
 
 export fn setSampleRate(s: f32) void {
@@ -127,36 +127,39 @@ export fn setSampleRate(s: f32) void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
     var fbs = std.io.fixedBufferStream(synth_font);
-    var reader = fbs.reader();
-    var sound_font = SoundFont.init(allocator, reader) catch unreachable;
-    var settings = SynthesizerSettings.init(@floatToInt(i32, s));
+    const reader = fbs.reader();
+    const sound_font = SoundFont.init(allocator, reader) catch unreachable;
+    var settings = SynthesizerSettings.init(@as(i32, @intFromFloat(s)));
     settings.block_size = RENDER_QUANTUM_FRAMES;
-    synthesizer = Synthesizer.init(allocator, sound_font, settings) catch unreachable;
+    synthesizer = Synthesizer.init(allocator, &sound_font, &settings) catch unreachable;
 
     // create mod player
-    _ = pocketmod.pocketmod_init(&ctx, mod_data, mod_data.len, @floatToInt(c_int, sampleRate));
+    _ = pocketmod.pocketmod_init(&ctx, mod_data, mod_data.len, @as(c_int, @intFromFloat(sampleRate)));
 }
 
 export fn getLeftBufPtr() [*]u8 {
-    return @ptrCast([*]u8, &mix_left);
+    return @ptrCast(&mix_left);
 }
 
 export fn getRightBufPtr() [*]u8 {
-    return @ptrCast([*]u8, &mix_right);
+    return @ptrCast(&mix_right);
 }
 
 export fn renderSoundQuantum() void {
-    synthesizer.render(&fx_left, &fx_right);
+    // uncomment to use broken ziggysynth
+    @memset(&fx_left, 0);
+    @memset(&fx_right, 0);
+    //synthesizer.render(&fx_left, &fx_right);
 
     var bytes: usize = RENDER_QUANTUM_FRAMES * 4 * 2;
 
     // pocketmod produces interleaved l/r/l/r data, so fetch a double batch
-    var lrbuf = @ptrCast([*]u8, &music_leftright);
+    const lrbuf:[*]u8 = @ptrCast(&music_leftright);
     bytes = RENDER_QUANTUM_FRAMES * 4 * 2;
     var i: usize = 0;
     while (i < bytes) {
-        const count = pocketmod.pocketmod_render(&ctx, lrbuf + i, @intCast(c_int, bytes - i));
-        i += @intCast(usize, count);
+        const count = pocketmod.pocketmod_render(&ctx, lrbuf + i, @as(c_int, @intCast(bytes - i)));
+        i += @as(usize, @intCast(count));
     }
 
     // deinterleave music into the l and r buffers and mix fx
@@ -183,7 +186,7 @@ export fn update(deltaMs: u32) void {
     }
 
     // scale factor deltaMs to give constant speed regardless of fps
-    const deltaScale = @intToFloat(f32, deltaMs) / 1000.0;
+    const deltaScale = @as(f32, @floatFromInt(deltaMs)) / 1000.0;
 
     // bounce ball
     // left and right
@@ -260,7 +263,7 @@ fn fillRect(xpos: i32, ypos: i32, width: i32, height: i32, colour: u32) void {
     while (y < y2) : (y += 1) {
         var xi = x;
         while (xi < x2) : (xi += 1) {
-            gfxFramebuffer[@intCast(usize, y) * WIDTH + @intCast(usize, xi)] = colour;
+            gfxFramebuffer[@as(usize, @intCast(y)) * WIDTH + @as(usize, @intCast(xi))] = colour;
         }
     }
 }
@@ -279,15 +282,15 @@ fn printFPS() void {
 }
 
 fn HSVtoRGB(h: f32, s: f32, v: f32) u32 {
-    var i: f32 = std.math.floor(h * 6);
-    var f: f32 = h * 6 - i;
-    var p: f32 = v * (1 - s);
-    var q: f32 = v * (1 - f * s);
-    var t: f32 = v * (1 - (1 - f) * s);
+    const i: f32 = std.math.floor(h * 6);
+    const f: f32 = h * 6 - i;
+    const p: f32 = v * (1 - s);
+    const q: f32 = v * (1 - f * s);
+    const t: f32 = v * (1 - (1 - f) * s);
     var r: f32 = undefined;
     var g: f32 = undefined;
     var b: f32 = undefined;
-    switch (@floatToInt(u32, i) % 6) {
+    switch (@as(u32, @intFromFloat(i)) % 6) {
         0 => {
             r = v;
             g = t;
@@ -324,9 +327,9 @@ fn HSVtoRGB(h: f32, s: f32, v: f32) u32 {
     const rf = std.math.round(r * 255);
     const gf = std.math.round(g * 255);
     const bf = std.math.round(b * 255);
-    const r8 = @floatToInt(u8, rf);
-    const g8 = @floatToInt(u8, gf);
-    const b8 = @floatToInt(u8, bf);
+    const r8:u8 = @intFromFloat(rf);
+    const g8:u8 = @intFromFloat(gf);
+    const b8:u8 = @intFromFloat(bf);
     const colour: u32 = 0xFF000000 | @as(u32, b8) << 16 | @as(u32, g8) << 8 | @as(u32, r8);
     return colour;
 }
@@ -344,9 +347,9 @@ fn drawPlasma() void {
             value += 4; // shift range from -4 .. 4 to 0 .. 8
             value /= 8; // bring range down to 0 .. 1
 
-            const t: f32 = @intToFloat(f32, millis()) / 10000;
+            const t: f32 = @as(f32, @floatFromInt(millis())) / 10000;
 
-            gfxFramebuffer[@floatToInt(usize, y) * WIDTH + @floatToInt(usize, x)] = HSVtoRGB(value + t, 0.5, 2);
+            gfxFramebuffer[@as(usize, @intFromFloat(y)) * WIDTH + @as(usize, @intFromFloat(x))] = HSVtoRGB(value + t, 0.5, 2);
         }
     }
 }
@@ -357,11 +360,11 @@ export fn renderGfx() void {
     drawPlasma();
 
     // ball
-    fillRect(@floatToInt(i32, ballx - 4), @floatToInt(i32, bally - 4), 8, 8, COLOUR_BLACK);
-    fillRect(@floatToInt(i32, ballx - 2), @floatToInt(i32, bally - 2), 4, 4, COLOUR_WHITE);
+    fillRect(@intFromFloat(ballx - 4), @intFromFloat(bally - 4), 8, 8, COLOUR_BLACK);
+    fillRect(@intFromFloat(ballx - 2), @intFromFloat(bally - 2), 4, 4, COLOUR_WHITE);
 
     // bat
-    fillRect(@floatToInt(i32, batx), @floatToInt(i32, baty), @floatToInt(i32, batwidth), @floatToInt(i32, batheight), COLOUR_BLACK);
+    fillRect(@intFromFloat(batx), @intFromFloat(baty), @intFromFloat(batwidth), @intFromFloat(batheight), COLOUR_BLACK);
 
     printFPS();
 }

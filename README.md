@@ -4,6 +4,8 @@ Toby Jaffey https://mastodon.me.uk/@tobyjaffey
 
 Straightforward examples of integrating Zig and Wasm for audio and graphics on the web.
 
+Compiling against Zig v0.12. Currently, MIDI synthesis examples (using Ziggysynth) are broken and have been disabled.
+
 ## Aims
 
  - Cross-platform (running on multiple browsers and operating systems)
@@ -35,6 +37,13 @@ Visit https://ringtailsoftware.github.io/zig-wasm-audio-framebuffer
     make
 
 Browse to http://localhost:8000
+
+# Interactive dev with docker
+
+Share working directory into docker, so edits can be made on the host
+
+    docker run -v $PWD:/live -w /live -p8000:8000 -ti --rm zig-wasm-audio-framebuffer /bin/sh
+    zig build && (cd /live/zig-out && python3 -m http.server 8000)
 
 ## Video system
 

@@ -96,7 +96,7 @@ pub fn SpecializeOn(comptime Real: type) type {
                 /// returns either a normalized vector (`length() = 1`) or `zero` if the vector
                 /// has length 0.
                 pub fn normalize(vec: Self) Self {
-                    var len = vec.length();
+                    const len = vec.length();
                     return if (len != 0.0)
                         vec.scale(1.0 / vec.length())
                     else
@@ -551,7 +551,7 @@ pub fn SpecializeOn(comptime Real: type) type {
             /// `aspect` is the screen aspect ratio (width / height)
             /// `near` is the distance of the near clip plane, whereas `far` is the distance to the far clip plane.
             pub fn createPerspective(fov: Real, aspect: Real, near: Real, far: Real) Self {
-                std.debug.assert(@fabs(aspect - 0.001) > 0);
+                std.debug.assert(@abs(aspect - 0.001) > 0);
 
                 const tanHalfFovy = @tan(fov / 2);
 
@@ -566,11 +566,11 @@ pub fn SpecializeOn(comptime Real: type) type {
 
             /// creates a rotation matrix around a certain axis.
             pub fn createAngleAxis(axis: Vec3, angle: Real) Self {
-                var cos = @cos(angle);
-                var sin = @sin(angle);
-                var x = axis.x;
-                var y = axis.y;
-                var z = axis.z;
+                const cos = @cos(angle);
+                const sin = @sin(angle);
+                const x = axis.x;
+                const y = axis.y;
+                const z = axis.z;
 
                 return Self{
                     .fields = [4][4]Real{
@@ -655,7 +655,7 @@ pub fn SpecializeOn(comptime Real: type) type {
             /// only works on float matrices
             pub fn invert(src: Self) ?Self {
                 // https://github.com/stackgl/gl-mat4/blob/master/invert.js
-                const a = @bitCast([16]Real, src.fields);
+                const a:[16]Real = @bitCast(src.fields);
 
                 const a00 = a[0];
                 const a01 = a[1];
@@ -714,7 +714,7 @@ pub fn SpecializeOn(comptime Real: type) type {
                     (a20 * b03 - a21 * b01 + a22 * b00) * det, // 15
                 };
                 return Self{
-                    .fields = @bitCast([4][4]Real, out),
+                    .fields = @bitCast(out),
                 };
             }
         };

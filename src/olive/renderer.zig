@@ -43,7 +43,7 @@ pub const Renderer = struct {
     /// Note, font is incomplete, some glyphs do not appear
     pub fn text(self: *Self, x: i32, y: i32, str: []const u8) void {
         var buf: [256:0]u8 = undefined;
-        _ = std.fmt.bufPrintZ(&buf, "{s}", .{str}) catch 0;
+        _ = std.fmt.bufPrintZ(&buf, "{s}", .{str}) catch return;
         olive.olivec_text(self.surface.oc, &buf, x, y, olive.olivec_default_font, 2, 0xFFFFFFFF);
     }
 };

@@ -47,7 +47,7 @@ fn gear(inner_radius: tgl.GLfloat, outer_radius: tgl.GLfloat, width: tgl.GLfloat
     r1 = outer_radius - tooth_depth / 2.0;
     r2 = outer_radius + tooth_depth / 2.0;
 
-    da = 2.0 * std.math.pi / @intToFloat(tgl.GLfloat, teeth) / 4.0;
+    da = 2.0 * std.math.pi / @as(tgl.GLfloat, @floatFromInt(teeth)) / 4.0;
 
     tgl.glShadeModel(tgl.GL_FLAT);
 
@@ -58,7 +58,7 @@ fn gear(inner_radius: tgl.GLfloat, outer_radius: tgl.GLfloat, width: tgl.GLfloat
 
     i = 0;
     while (i <= teeth) : (i += 1) {
-        ang = @intToFloat(tgl.GLfloat, i) * 2.0 * std.math.pi / @intToFloat(tgl.GLfloat, teeth);
+        ang = @as(tgl.GLfloat, @floatFromInt(i)) * 2.0 * std.math.pi / @as(tgl.GLfloat, @floatFromInt(teeth));
         tgl.glVertex3f(r0 * @cos(ang), r0 * @sin(ang), width * 0.5);
         tgl.glVertex3f(r1 * @cos(ang), r1 * @sin(ang), width * 0.5);
         tgl.glVertex3f(r0 * @cos(ang), r0 * @sin(ang), width * 0.5);
@@ -68,10 +68,10 @@ fn gear(inner_radius: tgl.GLfloat, outer_radius: tgl.GLfloat, width: tgl.GLfloat
 
     // draw front sides of teeth
     tgl.glBegin(tgl.GL_QUADS);
-    da = 2.0 * std.math.pi / @intToFloat(tgl.GLfloat, teeth) / 4.0;
+    da = 2.0 * std.math.pi / @as(tgl.GLfloat, @floatFromInt(teeth)) / 4.0;
     i = 0;
     while (i < teeth) : (i += 1) {
-        ang = @intToFloat(tgl.GLfloat, i) * 2.0 * std.math.pi / @intToFloat(tgl.GLfloat, teeth);
+        ang = @as(tgl.GLfloat, @floatFromInt(i)) * 2.0 * std.math.pi / @as(tgl.GLfloat, @floatFromInt(teeth));
 
         tgl.glVertex3f(r1 * @cos(ang), r1 * @sin(ang), width * 0.5);
         tgl.glVertex3f(r2 * @cos(ang + da), r2 * @sin(ang + da), width * 0.5);
@@ -86,7 +86,7 @@ fn gear(inner_radius: tgl.GLfloat, outer_radius: tgl.GLfloat, width: tgl.GLfloat
     tgl.glBegin(tgl.GL_QUAD_STRIP);
     i = 0;
     while (i <= teeth) : (i += 1) {
-        ang = @intToFloat(tgl.GLfloat, i) * 2.0 * std.math.pi / @intToFloat(tgl.GLfloat, teeth);
+        ang = @as(tgl.GLfloat, @floatFromInt(i)) * 2.0 * std.math.pi / @as(tgl.GLfloat, @floatFromInt(teeth));
         tgl.glVertex3f(r1 * @cos(ang), r1 * @sin(ang), -width * 0.5);
         tgl.glVertex3f(r0 * @cos(ang), r0 * @sin(ang), -width * 0.5);
         tgl.glVertex3f(r1 * @cos(ang + 3 * da), r1 * @sin(ang + 3 * da), -width * 0.5);
@@ -96,10 +96,10 @@ fn gear(inner_radius: tgl.GLfloat, outer_radius: tgl.GLfloat, width: tgl.GLfloat
 
     // draw back sides of teeth
     tgl.glBegin(tgl.GL_QUADS);
-    da = 2.0 * std.math.pi / @intToFloat(tgl.GLfloat, teeth) / 4.0;
+    da = 2.0 * std.math.pi / @as(tgl.GLfloat, @floatFromInt(teeth)) / 4.0;
     i = 0;
     while (i < teeth) : (i += 1) {
-        ang = @intToFloat(tgl.GLfloat, i) * 2.0 * std.math.pi / @intToFloat(tgl.GLfloat, teeth);
+        ang = @as(tgl.GLfloat, @floatFromInt(i)) * 2.0 * std.math.pi / @as(tgl.GLfloat, @floatFromInt(teeth));
 
         tgl.glVertex3f(r1 * @cos(ang + 3 * da), r1 * @sin(ang + 3 * da), -width * 0.5);
         tgl.glVertex3f(r2 * @cos(ang + 2 * da), r2 * @sin(ang + 2 * da), -width * 0.5);
@@ -112,7 +112,7 @@ fn gear(inner_radius: tgl.GLfloat, outer_radius: tgl.GLfloat, width: tgl.GLfloat
     tgl.glBegin(tgl.GL_QUAD_STRIP);
     i = 0;
     while (i <= teeth) : (i += 1) {
-        ang = @intToFloat(tgl.GLfloat, i) * 2.0 * std.math.pi / @intToFloat(tgl.GLfloat, teeth);
+        ang = @as(tgl.GLfloat, @floatFromInt(i)) * 2.0 * std.math.pi / @as(tgl.GLfloat, @floatFromInt(teeth));
 
         tgl.glVertex3f(r1 * @cos(ang), r1 * @sin(ang), width * 0.5);
         tgl.glVertex3f(r1 * @cos(ang), r1 * @sin(ang), -width * 0.5);
@@ -146,7 +146,7 @@ fn gear(inner_radius: tgl.GLfloat, outer_radius: tgl.GLfloat, width: tgl.GLfloat
     tgl.glBegin(tgl.GL_QUAD_STRIP);
     i = 0;
     while (i <= teeth) : (i += 1) {
-        ang = @intToFloat(tgl.GLfloat, i) * 2.0 * std.math.pi / @intToFloat(tgl.GLfloat, teeth);
+        ang = @as(tgl.GLfloat, @floatFromInt(i)) * 2.0 * std.math.pi / @as(tgl.GLfloat, @floatFromInt(teeth));
         tgl.glNormal3f(-@cos(ang), -@sin(ang), 0.0);
         tgl.glVertex3f(r0 * @cos(ang), r0 * @sin(ang), -width * 0.5);
         tgl.glVertex3f(r0 * @cos(ang), r0 * @sin(ang), width * 0.5);
@@ -198,9 +198,9 @@ fn make_object() tgl.GLuint {
 }
 
 fn reshape(width: c_int, height: c_int) void {
-    var h: tgl.GLfloat = @intToFloat(tgl.GLfloat, height) / @intToFloat(tgl.GLfloat, width);
+    const h: tgl.GLfloat = @as(tgl.GLfloat, @floatFromInt(height)) / @as(tgl.GLfloat, @floatFromInt(width));
 
-    tgl.glViewport(0, 0, @intCast(tgl.GLint, width), @intCast(tgl.GLint, height));
+    tgl.glViewport(0, 0, @intCast(width), @intCast(height));
     tgl.glMatrixMode(tgl.GL_PROJECTION);
     tgl.glLoadIdentity();
     tgl.glFrustum(-1.0, 1.0, -h, h, 5.0, 60.0);
@@ -235,25 +235,26 @@ extern fn getTimeUs() u32;
 
 // implement a backend for tgl
 export fn gl_malloc(size: c_int) callconv(.C) ?[*]u8 {
-    var mem = allocator.alloc(u8, @intCast(usize, size + @sizeOf(usize))) catch {
+    const mem = allocator.alloc(u8, @intCast(size + @sizeOf(usize))) catch {
         _ = console.print("ALLOCFAIL", .{}) catch 0;
         return null;
     };
-    const sz = @ptrCast(*usize, @alignCast(4, mem.ptr));
-    sz.* = @intCast(usize, size);
+    const sz:*usize = @ptrCast(@alignCast(mem.ptr));
+    sz.* = @intCast(size);
     return mem.ptr + @sizeOf(usize);
 }
 
 export fn gl_zalloc(size: c_int) callconv(.C) ?[*]u8 {
-    var mem: ?[*]u8 = gl_malloc(size);
+    const mem: ?[*]u8 = gl_malloc(size);
     if (mem != null) {
-        @memset(mem.?, 0x00, @intCast(usize, size));
+        const mems = mem.?[0 .. @intCast(size)];
+        @memset(mems, 0x00);
     }
     return mem;
 }
 
 export fn gl_free(ptr: [*]u8) callconv(.C) void {
-    const sz = @ptrCast(*const usize, @alignCast(@alignOf(*usize), ptr) - @sizeOf(usize));
+    const sz:*const usize = @ptrCast(@alignCast(ptr - @sizeOf(usize)));
     const p = ptr - @sizeOf(usize);
     allocator.free(p[0 .. sz.* + @sizeOf(usize)]);
 }
@@ -271,7 +272,12 @@ export fn zpow(x: f64, y: f64) callconv(.C) f64 {
     return std.math.pow(f64, x, y);
 }
 export fn zfabs(x: f64) callconv(.C) f64 {
-    return std.math.fabs(x);
+    return @abs(x);
+}
+
+export fn gl_memcpy(dst: [*]u8, src: [*]u8, size: c_int) callconv(.C) [*]u8 {
+    @memcpy(dst[0..@intCast(size)], src[0..@intCast(size)]);
+    return dst;
 }
 
 pub fn millis() u32 {
@@ -294,7 +300,7 @@ export fn keyevent(keycode: u32, down: bool) void {
 }
 
 export fn getGfxBufPtr() [*]u8 {
-    return @ptrCast([*]u8, &gfxFramebuffer);
+    return @ptrCast(&gfxFramebuffer);
 }
 
 export fn setSampleRate(s: f32) void {
@@ -302,11 +308,11 @@ export fn setSampleRate(s: f32) void {
 }
 
 export fn getLeftBufPtr() [*]u8 {
-    return @ptrCast([*]u8, &mix_left);
+    return @ptrCast(&mix_left);
 }
 
 export fn getRightBufPtr() [*]u8 {
-    return @ptrCast([*]u8, &mix_right);
+    return @ptrCast(&mix_right);
 }
 
 export fn renderSoundQuantum() void {}
@@ -315,7 +321,7 @@ export fn init() void {
     startTime = getTimeUs();
     frameCount = 0;
 
-    var zb: *tgl.ZBuffer = tgl.ZB_open(WIDTH, HEIGHT, tgl.ZB_MODE_RGBA, 0, 0, 0, &gfxFramebuffer);
+    const zb: *tgl.ZBuffer = tgl.ZB_open(WIDTH, HEIGHT, tgl.ZB_MODE_RGBA, 0, 0, 0, &gfxFramebuffer);
     tgl.glInit(zb);
 
     var glCtx: *tgl.GLContext = tgl.gl_get_context();

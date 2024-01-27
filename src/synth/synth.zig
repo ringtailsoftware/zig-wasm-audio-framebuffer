@@ -11,7 +11,6 @@ const RENDER_QUANTUM_FRAMES = 128;
 var left: [RENDER_QUANTUM_FRAMES]f32 = undefined;
 var right: [RENDER_QUANTUM_FRAMES]f32 = undefined;
 var sampleRate: f32 = 44100;
-var frameCounter: usize = 0;
 var synthesizer: Synthesizer = undefined;
 
 pub const std_options = struct {
@@ -44,19 +43,19 @@ export fn setSampleRate(s: f32) void {
     const allocator = gpa.allocator();
     const data = @embedFile("TimGM6mb.sf2");
     var fbs = std.io.fixedBufferStream(data);
-    var reader = fbs.reader();
-    var sound_font = SoundFont.init(allocator, reader) catch unreachable;
-    var settings = SynthesizerSettings.init(@floatToInt(i32, s));
+    const reader = fbs.reader();
+    const sound_font = SoundFont.init(allocator, reader) catch unreachable;
+    var settings = SynthesizerSettings.init(@intFromFloat(s));
     settings.block_size = RENDER_QUANTUM_FRAMES;
-    synthesizer = Synthesizer.init(allocator, sound_font, settings) catch unreachable;
+    synthesizer = Synthesizer.init(allocator, &sound_font, &settings) catch unreachable;
 }
 
 export fn getLeftBufPtr() [*]u8 {
-    return @ptrCast([*]u8, &left);
+    return @ptrCast(&left);
 }
 
 export fn getRightBufPtr() [*]u8 {
-    return @ptrCast([*]u8, &right);
+    return @ptrCast(&right);
 }
 
 export fn renderSoundQuantum() void {

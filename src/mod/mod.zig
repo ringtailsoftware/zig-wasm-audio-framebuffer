@@ -18,27 +18,27 @@ const mod_data = @embedFile("bananasplit.mod");
 export fn setSampleRate(s: f32) void {
     sampleRate = s;
 
-    _ = pocketmod.pocketmod_init(&ctx, mod_data, mod_data.len, @floatToInt(c_int, sampleRate));
+    _ = pocketmod.pocketmod_init(&ctx, mod_data, mod_data.len, @as(c_int, @intFromFloat(sampleRate)));
 }
 
 export fn getLeftBufPtr() [*]u8 {
-    return @ptrCast([*]u8, &left);
+    return @ptrCast(&left);
 }
 
 export fn getRightBufPtr() [*]u8 {
-    return @ptrCast([*]u8, &right);
+    return @ptrCast(&right);
 }
 
 export fn renderSoundQuantum() void {
     var bytes: usize = RENDER_QUANTUM_FRAMES * 4 * 2;
 
     // pocketmod produces interleaved l/r/l/r data, so fetch a double batch
-    var lrbuf = @ptrCast([*]u8, &leftright);
+    const lrbuf:[*]u8 = @ptrCast(&leftright);
     bytes = RENDER_QUANTUM_FRAMES * 4 * 2;
     var i: usize = 0;
     while (i < bytes) {
-        const count = pocketmod.pocketmod_render(&ctx, lrbuf + i, @intCast(c_int, bytes - i));
-        i += @intCast(usize, count);
+        const count = pocketmod.pocketmod_render(&ctx, lrbuf + i, @as(c_int, @intCast(bytes - i)));
+        i += @as(usize, @intCast(count));
     }
 
     // then deinterleave it into the l and r buffers

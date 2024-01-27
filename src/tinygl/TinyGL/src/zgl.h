@@ -7,10 +7,12 @@
 #define assert(X) // FIXME
 
 extern double zsin(double x);
+extern double zfloor(double x);
 extern double zcos(double x);
 extern double zfabs(double x);
 extern double zsqrt(double x);
 extern double zpow(double x, double y);
+extern void *gl_memcpy(void *dst, const void *src, int n);
 
 //#include <stdlib.h>
 //#include <stdio.h>

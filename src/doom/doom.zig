@@ -34,7 +34,7 @@ const music_volume = 0.5;
 
 var startTime: u32 = 0;
 
-const WAD_FILE_HANDLE: *c_int = @intToPtr(*c_int, 0x00000008); // some unique value we give when wad file opened
+const WAD_FILE_HANDLE: *c_int = @ptrFromInt(0x00000008); // some unique value we give when wad file opened
 var wad_stream_offset: usize = 0;
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -69,22 +69,22 @@ export fn doom_print_impl(msg: [*:0]const u8) callconv(.C) void {
 }
 
 export fn doom_gettime_impl(sec: *c_int, usec: *c_int) callconv(.C) void {
-    sec.* = @intCast(c_int, millis() / 1000);
-    usec.* = @intCast(c_int, @mod(millis() * 1000, 1000000));
+    sec.* = @intCast(millis() / 1000);
+    usec.* = @intCast(@mod(millis() * 1000, 1000000));
 }
 
 export fn doom_malloc_impl(size: c_int) callconv(.C) ?[*]u8 {
-    var mem = allocator.alloc(u8, @intCast(usize, size + @sizeOf(usize))) catch {
+    const mem = allocator.alloc(u8, @intCast(size + @sizeOf(usize))) catch {
         _ = console.print("ALLOCFAIL", .{}) catch 0;
         return null;
     };
-    const sz = @ptrCast(*usize, @alignCast(4, mem.ptr));
-    sz.* = @intCast(usize, size);
+    const sz:*usize = @ptrCast(@alignCast(mem.ptr));
+    sz.* = @intCast(size);
     return mem.ptr + @sizeOf(usize);
 }
 
 export fn doom_free_impl(ptr: [*]u8) callconv(.C) void {
-    const sz = @ptrCast(*const usize, @alignCast(@alignOf(*usize), ptr) - @sizeOf(usize));
+    const sz:*const usize = @ptrCast(@alignCast(ptr - @sizeOf(usize)));
     const p = ptr - @sizeOf(usize);
     allocator.free(p[0 .. sz.* + @sizeOf(usize)]);
 }
@@ -106,11 +106,11 @@ export fn doom_read_impl(handle: *c_int, buf: [*]u8, count: c_int) callconv(.C) 
         _ = console.print("doom_read_impl invalid handle!\n", .{}) catch 0;
         return 0;
     }
-    const dst = buf[0..@intCast(usize, count)];
-    const src = wad_data[wad_stream_offset .. wad_stream_offset + @intCast(usize, count)];
+    const dst = buf[0..@intCast(count)];
+    const src = wad_data[wad_stream_offset .. wad_stream_offset + @as(usize, @intCast(count))];
 
-    std.mem.copy(u8, dst, src);
-    wad_stream_offset += @intCast(usize, count);
+    std.mem.copyForwards(u8, dst, src);
+    wad_stream_offset += @intCast(count);
     return count;
 }
 export fn doom_write_impl(handle: *c_int, buf: *const anyopaque, count: c_int) callconv(.C) c_int {
@@ -126,9 +126,9 @@ export fn doom_seek_impl(handle: *c_int, offset: c_int, origin: pd.doom_seek_t) 
         return 0;
     }
     switch (origin) {
-        pd.DOOM_SEEK_CUR => wad_stream_offset += @intCast(usize, offset),
-        pd.DOOM_SEEK_END => wad_stream_offset = wad_data.len - @intCast(usize, offset),
-        pd.DOOM_SEEK_SET => wad_stream_offset = @intCast(usize, offset),
+        pd.DOOM_SEEK_CUR => wad_stream_offset += @intCast(offset),
+        pd.DOOM_SEEK_END => wad_stream_offset = wad_data.len - @as(usize, @intCast(offset)),
+        pd.DOOM_SEEK_SET => wad_stream_offset = @as(usize, @intCast(offset)),
         else => {},
     }
     return 0;
@@ -138,7 +138,7 @@ export fn doom_tell_impl(handle: *c_int) callconv(.C) c_int {
         _ = console.print("doom_tell_impl invalid handle!\n", .{}) catch 0;
         return 0;
     }
-    return @intCast(c_int, wad_stream_offset);
+    return @intCast(wad_stream_offset);
 }
 export fn doom_eof_impl(handle: *c_int) callconv(.C) c_int {
     if (handle != WAD_FILE_HANDLE) {
@@ -169,7 +169,7 @@ export fn keyevent(keycode: u32, down: bool) void {
 }
 
 export fn getGfxBufPtr() [*]u8 {
-    return @ptrCast([*]u8, &gfxFramebuffer);
+    return @ptrCast(&gfxFramebuffer);
 }
 
 export fn setSampleRate(s: f32) void {
@@ -177,19 +177,19 @@ export fn setSampleRate(s: f32) void {
 
     // create the synthesizer
     var fbs = std.io.fixedBufferStream(synth_font);
-    var reader = fbs.reader();
+    const reader = fbs.reader();
     var sound_font = SoundFont.init(allocator, reader) catch unreachable;
-    var settings = SynthesizerSettings.init(@floatToInt(i32, s));
+    var settings = SynthesizerSettings.init(@intFromFloat(s));
     settings.block_size = RENDER_QUANTUM_FRAMES;
-    synthesizer = Synthesizer.init(allocator, sound_font, settings) catch unreachable;
+    synthesizer = Synthesizer.init(allocator, &sound_font, &settings) catch unreachable;
 }
 
 export fn getLeftBufPtr() [*]u8 {
-    return @ptrCast([*]u8, &mix_left);
+    return @ptrCast(&mix_left);
 }
 
 export fn getRightBufPtr() [*]u8 {
-    return @ptrCast([*]u8, &mix_right);
+    return @ptrCast(&mix_right);
 }
 
 export fn renderSoundQuantum() void {
@@ -204,10 +204,10 @@ export fn renderSoundQuantum() void {
     var i: usize = 0;
     while (i < RENDER_QUANTUM_FRAMES) : (i += 2) {
         // double up audio samples as doom produces at 11025, but webaudio will only go down to 22050
-        mix_left[i] = fx_volume * @intToFloat(f32, doomSndBuf[i + (audioBlockIndex * 64)]) / 32768.0;
-        mix_left[i + 1] = fx_volume * @intToFloat(f32, doomSndBuf[i + (audioBlockIndex * 64)]) / 32768.0;
-        mix_right[i] = fx_volume * @intToFloat(f32, doomSndBuf[i + (audioBlockIndex * 2 * 64)]) / 32768.0;
-        mix_right[i + 1] = fx_volume * @intToFloat(f32, doomSndBuf[i + (audioBlockIndex * 2 * 64)]) / 32768.0;
+        mix_left[i] = fx_volume * @as(f32, @floatFromInt(doomSndBuf[i + (audioBlockIndex * 64)])) / 32768.0;
+        mix_left[i + 1] = fx_volume * @as(f32, @floatFromInt(doomSndBuf[i + (audioBlockIndex * 64)])) / 32768.0;
+        mix_right[i] = fx_volume * @as(f32, @floatFromInt(doomSndBuf[i + (audioBlockIndex * 2 * 64)])) / 32768.0;
+        mix_right[i + 1] = fx_volume * @as(f32, @floatFromInt(doomSndBuf[i + (audioBlockIndex * 2 * 64)])) / 32768.0;
     }
 
     i = 0;
@@ -240,20 +240,23 @@ export fn update(deltaMs: u32) void {
             if (midi_msg == 0) {
                 break;
             }
-            const status: u8 = @truncate(u8, midi_msg & 0x000000FF);
-            const note: u8 = @truncate(u8, (midi_msg & 0x0000FF00) >> 8);
-            const vel: u8 = @truncate(u8, (midi_msg & 0x00FF0000) >> 16);
+            const status: u8 = @truncate(midi_msg & 0x000000FF);
+            const note: u8 = @truncate((midi_msg & 0x0000FF00) >> 8);
+            const vel: u8 = @truncate((midi_msg & 0x00FF0000) >> 16);
 
-            const channel: i32 = @intCast(i32, status & 0x0F);
-            const command: i32 = @intCast(i32, status & 0xF0);
-            var data1: i32 = @intCast(i32, note);
-            const data2: i32 = @intCast(i32, vel);
+            const channel: i32 = @intCast(status & 0x0F);
+            const command: i32 = @intCast(status & 0xF0);
+            var data1: i32 = @intCast(note);
+            const data2: i32 = @intCast(vel);
 
             //0xC0 34 is a problem for gzdoom.sf2 (replace electric bass finger -> electic bass pick)
             if (command == 0xC0 and data1 == 34) {
                 data1 = 35;
             }
-            synthesizer.processMidiMessage(channel, command, data1, data2);
+            // FIXME audio broken in zig v0.12 with ziggysynth, uncomment to test
+            _ = data2;
+            _ = channel;
+            //synthesizer.processMidiMessage(channel, command, data1, data2);
         }
     }
 }
@@ -275,8 +278,9 @@ export fn renderGfx() void {
     printFPS();
 
     const fb: [*]const u8 = pd.doom_get_framebuffer(4);
-    const fb32 = @ptrCast([*]const u32, @alignCast(4, fb))[0 .. WIDTH * HEIGHT];
-    std.mem.copy(u32, &gfxFramebuffer, fb32);
+    const fb32 = @as([*]const u32, @ptrCast(@alignCast(fb)))[0 .. WIDTH * HEIGHT];
+    @memcpy(&gfxFramebuffer, fb32);
+
 }
 
 fn keycodeToDoomKey(keycode: u32) pd.doom_key_t {

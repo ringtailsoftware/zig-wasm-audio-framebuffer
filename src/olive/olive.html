@@ -20,7 +20,7 @@
     import { WasmPcm } from "./wasmpcm.js";
 
     window.addEventListener('load', async () => {
-        await WasmPcm.init('lib/olive.wasm');
+        await WasmPcm.init('bin/olive.wasm');
         const buttonEl = document.getElementById('button-start');
         buttonEl.innerHTML = "Start";
         buttonEl.disabled = false;

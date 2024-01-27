@@ -16,22 +16,16 @@ const ZiggySynthError = error{
 
 const ArrayMath = struct {
     fn multiplyAdd(a: f32, x: []f32, destination: []f32) void {
-        const destination_length = destination.len;
-
-        var i: usize = 0;
-        while (i < destination_length) : (i += 1) {
-            destination[i] += a * x[i];
+        for (x, destination) |value, *dst| {
+            dst.* += a * value;
         }
     }
 
     fn multiplyAddSlope(a: f32, step: f32, x: []f32, destination: []f32) void {
-        const destination_length = destination.len;
-        var b = a;
-
-        var i: usize = 0;
-        while (i < destination_length) : (i += 1) {
-            destination[i] += b * x[i];
-            b += step;
+        var slope = a;
+        for (x, destination) |value, *dst| {
+            dst.* += slope * value;
+            slope += step;
         }
     }
 };
@@ -40,13 +34,13 @@ const BinaryReader = struct {
     fn read(comptime T: type, reader: anytype) !T {
         var data: [@sizeOf(T)]u8 = undefined;
         _ = try reader.readNoEof(&data);
-        return @bitCast(T, data);
+        return @bitCast(data);
     }
 
     fn readBigEndian(comptime T: type, reader: anytype) !T {
         var data: [@sizeOf(T)]u8 = undefined;
         _ = try reader.readNoEof(&data);
-        return @byteSwap(@bitCast(T, data));
+        return @byteSwap(@as(T, @bitCast(data)));
     }
 
     fn readIntVariableLength(reader: anytype) !i32 {
@@ -54,7 +48,7 @@ const BinaryReader = struct {
         var count: i32 = 0;
 
         while (true) {
-            const value = @intCast(i32, try BinaryReader.read(u8, reader));
+            const value: i32 = @intCast(try BinaryReader.read(u8, reader));
             acc = (acc << 7) | (value & 127);
             if ((value & 128) == 0) {
                 break;
@@ -68,6 +62,32 @@ const BinaryReader = struct {
         return acc;
     }
 };
+
+fn ReadCounter(comptime T: type) type {
+    return struct {
+        const Self = @This();
+
+        reader: T,
+        count: usize,
+
+        fn init(reader: T) Self {
+            return Self{
+                .reader = reader,
+                .count = 0,
+            };
+        }
+
+        fn readNoEof(self: *Self, buf: []u8) !void {
+            try self.reader.readNoEof(buf);
+            self.count += buf.len;
+        }
+
+        fn skipBytes(self: *Self, num_bytes: u64, options: anytype) !void {
+            try self.reader.skipBytes(num_bytes, options);
+            self.count += @as(usize, @intCast(num_bytes));
+        }
+    };
+}
 
 pub const SoundFont = struct {
     const Self = @This();
@@ -171,32 +191,25 @@ const SoundFontSampleData = struct {
         }
 
         const end = try BinaryReader.read(u32, reader);
+        var rc = ReadCounter(@TypeOf(reader)).init(reader);
 
-        var pos: u32 = 0;
-
-        const list_type = try BinaryReader.read([4]u8, reader);
+        const list_type = try BinaryReader.read([4]u8, &rc);
         if (!mem.eql(u8, &list_type, "sdta")) {
             return ZiggySynthError.InvalidSoundFont;
         }
-        pos += 4;
 
-        while (pos < end) {
-            const id = try BinaryReader.read([4]u8, reader);
-            pos += 4;
-
-            const size = try BinaryReader.read(u32, reader);
-            pos += 4;
+        while (rc.count < end) {
+            const id = try BinaryReader.read([4]u8, &rc);
+            const size = try BinaryReader.read(u32, &rc);
 
             if (mem.eql(u8, &id, "smpl")) {
                 wave_data = try allocator.alloc(i16, size / 2);
-                try reader.readNoEof(@ptrCast([*]u8, wave_data.?.ptr)[0..size]);
+                try rc.readNoEof(@as([*]u8, @ptrCast(wave_data.?.ptr))[0..size]);
             } else if (mem.eql(u8, &id, "sm24")) {
-                try reader.skipBytes(size, .{});
+                try rc.skipBytes(size, .{});
             } else {
                 return ZiggySynthError.InvalidSoundFont;
             }
-
-            pos += size;
         }
 
         _ = wave_data orelse return ZiggySynthError.InvalidSoundFont;
@@ -245,45 +258,38 @@ const SoundFontParameters = struct {
         }
 
         const end = try BinaryReader.read(u32, reader);
+        var rc = ReadCounter(@TypeOf(reader)).init(reader);
 
-        var pos: u32 = 0;
-
-        const list_type = try BinaryReader.read([4]u8, reader);
+        const list_type = try BinaryReader.read([4]u8, &rc);
         if (!mem.eql(u8, &list_type, "pdta")) {
             return ZiggySynthError.InvalidSoundFont;
         }
-        pos += 4;
 
-        while (pos < end) {
-            const id = try BinaryReader.read([4]u8, reader);
-            pos += 4;
-
-            const size = try BinaryReader.read(u32, reader);
-            pos += 4;
+        while (rc.count < end) {
+            const id = try BinaryReader.read([4]u8, &rc);
+            const size = try BinaryReader.read(u32, &rc);
 
             if (mem.eql(u8, &id, "phdr")) {
-                preset_infos = try PresetInfo.readFromChunk(allocator, reader, size);
+                preset_infos = try PresetInfo.readFromChunk(allocator, &rc, size);
             } else if (mem.eql(u8, &id, "pbag")) {
-                preset_bag = try ZoneInfo.readFromChunk(allocator, reader, size);
+                preset_bag = try ZoneInfo.readFromChunk(allocator, &rc, size);
             } else if (mem.eql(u8, &id, "pmod")) {
-                try reader.skipBytes(size, .{});
+                try rc.skipBytes(size, .{});
             } else if (mem.eql(u8, &id, "pgen")) {
-                preset_generators = try Generator.readFromChunk(allocator, reader, size);
+                preset_generators = try Generator.readFromChunk(allocator, &rc, size);
             } else if (mem.eql(u8, &id, "inst")) {
-                instrument_infos = try InstrumentInfo.readFromChunk(allocator, reader, size);
+                instrument_infos = try InstrumentInfo.readFromChunk(allocator, &rc, size);
             } else if (mem.eql(u8, &id, "ibag")) {
-                instrument_bag = try ZoneInfo.readFromChunk(allocator, reader, size);
+                instrument_bag = try ZoneInfo.readFromChunk(allocator, &rc, size);
             } else if (mem.eql(u8, &id, "imod")) {
-                try reader.skipBytes(size, .{});
+                try rc.skipBytes(size, .{});
             } else if (mem.eql(u8, &id, "igen")) {
-                instrument_generators = try Generator.readFromChunk(allocator, reader, size);
+                instrument_generators = try Generator.readFromChunk(allocator, &rc, size);
             } else if (mem.eql(u8, &id, "shdr")) {
-                sample_headers = try SampleHeader.readFromChunk(allocator, reader, size);
+                sample_headers = try SampleHeader.readFromChunk(allocator, &rc, size);
             } else {
                 return ZiggySynthError.InvalidSoundFont;
             }
-
-            pos += size;
         }
 
         _ = preset_infos orelse return ZiggySynthError.InvalidSoundFont;
@@ -358,7 +364,7 @@ const SoundFontMath = struct {
     }
 
     fn keyNumberToMultiplyingFactor(cents: i32, key: i32) f32 {
-        return timecentsToSeconds(@intToFloat(f32, cents * (60 - key)));
+        return timecentsToSeconds(@floatFromInt(cents * (60 - key)));
     }
 
     fn expCutoff(x: f64) f64 {
@@ -396,8 +402,7 @@ const Generator = struct {
         var generators = try allocator.alloc(Self, count);
         errdefer allocator.free(generators);
 
-        var i: usize = 0;
-        while (i < count) : (i += 1) {
+        for (0..count) |i| {
             generators[i] = try Generator.init(reader);
         }
 
@@ -490,7 +495,7 @@ const Zone = struct {
     fn init(info: *ZoneInfo, generators: []Generator) Self {
         const start = info.generator_index;
         const end = start + info.generator_count;
-        var segment = generators[start..end];
+        const segment = generators[start..end];
 
         return Self{
             .generators = segment,
@@ -508,8 +513,7 @@ const Zone = struct {
         var zones = try allocator.alloc(Self, count);
         errdefer allocator.free(zones);
 
-        var i: usize = 0;
-        while (i < count) : (i += 1) {
+        for (0..count) |i| {
             zones[i] = Zone.init(&infos[i], generators);
         }
 
@@ -547,19 +551,13 @@ const ZoneInfo = struct {
         var zones = try allocator.alloc(Self, count);
         errdefer allocator.free(zones);
 
-        {
-            var i: usize = 0;
-            while (i < count) : (i += 1) {
-                zones[i] = try ZoneInfo.init(reader);
-            }
+        for (0..count) |i| {
+            zones[i] = try ZoneInfo.init(reader);
         }
 
-        {
-            var i: usize = 0;
-            while (i < count - 1) : (i += 1) {
-                zones[i].generator_count = zones[i + 1].generator_index - zones[i].generator_index;
-                zones[i].modulator_count = zones[i + 1].modulator_index - zones[i].modulator_index;
-            }
+        for (0..count - 1) |i| {
+            zones[i].generator_count = zones[i + 1].generator_index - zones[i].generator_index;
+            zones[i].modulator_count = zones[i + 1].modulator_index - zones[i].modulator_index;
         }
 
         return zones;
@@ -590,9 +588,8 @@ pub const Preset = struct {
         var presets = try allocator.alloc(Self, preset_count);
         errdefer allocator.free(presets);
 
-        var preset_index: usize = 0;
         var region_index: usize = 0;
-        while (preset_index < preset_count) : (preset_index += 1) {
+        for (0..preset_count) |preset_index| {
             const info = infos[preset_index];
             const zones = all_zones[info.zone_start_index..info.zone_end_index];
 
@@ -650,9 +647,7 @@ pub const PresetRegion = struct {
         const preset_count = infos.len - 1;
 
         var sum: usize = 0;
-
-        var preset_index: usize = 0;
-        while (preset_index < preset_count) : (preset_index += 1) {
+        for (0..preset_count) |preset_index| {
             const info = infos[preset_index];
             const zones = all_zones[info.zone_start_index..info.zone_end_index];
 
@@ -691,7 +686,7 @@ pub const PresetRegion = struct {
             setParameter(&gs, &value);
         }
 
-        const id = @intCast(usize, gs[GeneratorType.INSTRUMENT]);
+        const id: usize = @intCast(gs[GeneratorType.INSTRUMENT]);
         if (id >= instruments.len) {
             return ZiggySynthError.InvalidSoundFont;
         }
@@ -711,23 +706,20 @@ pub const PresetRegion = struct {
         errdefer allocator.free(regions);
         var region_index: usize = 0;
 
-        var preset_index: usize = 0;
-        while (preset_index < preset_count) : (preset_index += 1) {
+        for (0..preset_count) |preset_index| {
             const info = infos[preset_index];
             const zones = all_zones[info.zone_start_index..info.zone_end_index];
 
             // Is the first one the global zone?
             if (PresetRegion.containsGlobalZone(zones)) {
                 // The first one is the global zone.
-                var i: usize = 0;
-                while (i < zones.len - 1) : (i += 1) {
+                for (0..zones.len - 1) |i| {
                     regions[region_index] = try PresetRegion.init(&zones[0], &zones[i + 1], instruments);
                     region_index += 1;
                 }
             } else {
                 // No global zone.
-                var i: usize = 0;
-                while (i < zones.len) : (i += 1) {
+                for (0..zones.len) |i| {
                     regions[region_index] = try PresetRegion.init(&Zone.empty(), &zones[i], instruments);
                     region_index += 1;
                 }
@@ -748,159 +740,159 @@ pub const PresetRegion = struct {
     }
 
     pub fn getModulationLfoToPitch(self: *const Self) i32 {
-        return @intCast(i32, self.gs[GeneratorType.MODULATION_LFO_TO_PITCH]);
+        return @as(i32, @intCast(self.gs[GeneratorType.MODULATION_LFO_TO_PITCH]));
     }
 
     pub fn getVibratoLfoToPitch(self: *const Self) i32 {
-        return @intCast(i32, self.gs[GeneratorType.VIBRATO_LFO_TO_PITCH]);
+        return @as(i32, @intCast(self.gs[GeneratorType.VIBRATO_LFO_TO_PITCH]));
     }
 
     pub fn getModulationEnvelopeToPitch(self: *const Self) i32 {
-        return @intCast(i32, self.gs[GeneratorType.MODULATION_ENVELOPE_TO_PITCH]);
+        return @as(i32, @intCast(self.gs[GeneratorType.MODULATION_ENVELOPE_TO_PITCH]));
     }
 
     pub fn getInitialFilterCutoffFrequency(self: *const Self) f32 {
-        return SoundFontMath.centsToMultiplyingFactor(@intToFloat(f32, self.gs[GeneratorType.INITIAL_FILTER_CUTOFF_FREQUENCY]));
+        return SoundFontMath.centsToMultiplyingFactor(@as(f32, @floatFromInt(self.gs[GeneratorType.INITIAL_FILTER_CUTOFF_FREQUENCY])));
     }
 
     pub fn getInitialFilterQ(self: *const Self) f32 {
-        return 0.1 * @intToFloat(f32, self.gs[GeneratorType.INITIAL_FILTER_Q]);
+        return 0.1 * @as(f32, @floatFromInt(self.gs[GeneratorType.INITIAL_FILTER_Q]));
     }
 
     pub fn getModulationLfoToFilterCutoffFrequency(self: *const Self) i32 {
-        return @intCast(i32, self.gs[GeneratorType.MODULATION_LFO_TO_FILTER_CUTOFF_FREQUENCY]);
+        return @as(i32, @intCast(self.gs[GeneratorType.MODULATION_LFO_TO_FILTER_CUTOFF_FREQUENCY]));
     }
 
     pub fn getModulationEnvelopeToFilterCutoffFrequency(self: *const Self) i32 {
-        return @intCast(i32, self.gs[GeneratorType.MODULATION_ENVELOPE_TO_FILTER_CUTOFF_FREQUENCY]);
+        return @as(i32, @intCast(self.gs[GeneratorType.MODULATION_ENVELOPE_TO_FILTER_CUTOFF_FREQUENCY]));
     }
 
     pub fn getModulationLfoToVolume(self: *const Self) f32 {
-        return 0.1 * @intToFloat(f32, self.gs[GeneratorType.MODULATION_LFO_TO_VOLUME]);
+        return 0.1 * @as(f32, @floatFromInt(self.gs[GeneratorType.MODULATION_LFO_TO_VOLUME]));
     }
 
     pub fn getChorusEffectsSend(self: *const Self) f32 {
-        return 0.1 * @intToFloat(f32, self.gs[GeneratorType.CHORUS_EFFECTS_SEND]);
+        return 0.1 * @as(f32, @floatFromInt(self.gs[GeneratorType.CHORUS_EFFECTS_SEND]));
     }
 
     pub fn getReverbEffectsSend(self: *const Self) f32 {
-        return 0.1 * @intToFloat(f32, self.gs[GeneratorType.REVERB_EFFECTS_SEND]);
+        return 0.1 * @as(f32, @floatFromInt(self.gs[GeneratorType.REVERB_EFFECTS_SEND]));
     }
 
     pub fn getPan(self: *const Self) f32 {
-        return 0.1 * @intToFloat(f32, self.gs[GeneratorType.PAN]);
+        return 0.1 * @as(f32, @floatFromInt(self.gs[GeneratorType.PAN]));
     }
 
     pub fn getDelayModulationLfo(self: *const Self) f32 {
-        return SoundFontMath.centsToMultiplyingFactor(@intToFloat(f32, self.gs[GeneratorType.DELAY_MODULATION_LFO]));
+        return SoundFontMath.centsToMultiplyingFactor(@as(f32, @floatFromInt(self.gs[GeneratorType.DELAY_MODULATION_LFO])));
     }
 
     pub fn getFrequencyModulationLfo(self: *const Self) f32 {
-        return SoundFontMath.centsToMultiplyingFactor(@intToFloat(f32, self.gs[GeneratorType.FREQUENCY_MODULATION_LFO]));
+        return SoundFontMath.centsToMultiplyingFactor(@as(f32, @floatFromInt(self.gs[GeneratorType.FREQUENCY_MODULATION_LFO])));
     }
 
     pub fn getDelayVibratoLfo(self: *const Self) f32 {
-        return SoundFontMath.centsToMultiplyingFactor(@intToFloat(f32, self.gs[GeneratorType.DELAY_VIBRATO_LFO]));
+        return SoundFontMath.centsToMultiplyingFactor(@as(f32, @floatFromInt(self.gs[GeneratorType.DELAY_VIBRATO_LFO])));
     }
 
     pub fn getFrequencyVibratoLfo(self: *const Self) f32 {
-        return SoundFontMath.centsToMultiplyingFactor(@intToFloat(f32, self.gs[GeneratorType.FREQUENCY_VIBRATO_LFO]));
+        return SoundFontMath.centsToMultiplyingFactor(@as(f32, @floatFromInt(self.gs[GeneratorType.FREQUENCY_VIBRATO_LFO])));
     }
 
     pub fn getDelayModulationEnvelope(self: *const Self) f32 {
-        return SoundFontMath.centsToMultiplyingFactor(@intToFloat(f32, self.gs[GeneratorType.DELAY_MODULATION_ENVELOPE]));
+        return SoundFontMath.centsToMultiplyingFactor(@as(f32, @floatFromInt(self.gs[GeneratorType.DELAY_MODULATION_ENVELOPE])));
     }
 
     pub fn getAttackModulationEnvelope(self: *const Self) f32 {
-        return SoundFontMath.centsToMultiplyingFactor(@intToFloat(f32, self.gs[GeneratorType.ATTACK_MODULATION_ENVELOPE]));
+        return SoundFontMath.centsToMultiplyingFactor(@as(f32, @floatFromInt(self.gs[GeneratorType.ATTACK_MODULATION_ENVELOPE])));
     }
 
     pub fn getHoldModulationEnvelope(self: *const Self) f32 {
-        return SoundFontMath.centsToMultiplyingFactor(@intToFloat(f32, self.gs[GeneratorType.HOLD_MODULATION_ENVELOPE]));
+        return SoundFontMath.centsToMultiplyingFactor(@as(f32, @floatFromInt(self.gs[GeneratorType.HOLD_MODULATION_ENVELOPE])));
     }
 
     pub fn getDecayModulationEnvelope(self: *const Self) f32 {
-        return SoundFontMath.centsToMultiplyingFactor(@intToFloat(f32, self.gs[GeneratorType.DECAY_MODULATION_ENVELOPE]));
+        return SoundFontMath.centsToMultiplyingFactor(@as(f32, @floatFromInt(self.gs[GeneratorType.DECAY_MODULATION_ENVELOPE])));
     }
 
     pub fn getSustainModulationEnvelope(self: *const Self) f32 {
-        return 0.1 * @intToFloat(f32, self.gs[GeneratorType.SUSTAIN_MODULATION_ENVELOPE]);
+        return 0.1 * @as(f32, @floatFromInt(self.gs[GeneratorType.SUSTAIN_MODULATION_ENVELOPE]));
     }
 
     pub fn getReleaseModulationEnvelope(self: *const Self) f32 {
-        return SoundFontMath.centsToMultiplyingFactor(@intToFloat(f32, self.gs[GeneratorType.RELEASE_MODULATION_ENVELOPE]));
+        return SoundFontMath.centsToMultiplyingFactor(@as(f32, @floatFromInt(self.gs[GeneratorType.RELEASE_MODULATION_ENVELOPE])));
     }
 
     pub fn getKeyNumberToModulationEnvelopeHold(self: *const Self) i32 {
-        return @intCast(i32, self.gs[GeneratorType.KEY_NUMBER_TO_MODULATION_ENVELOPE_HOLD]);
+        return @as(i32, @intCast(self.gs[GeneratorType.KEY_NUMBER_TO_MODULATION_ENVELOPE_HOLD]));
     }
 
     pub fn getKeyNumberToModulationEnvelopeDecay(self: *const Self) i32 {
-        return @intCast(i32, self.gs[GeneratorType.KEY_NUMBER_TO_MODULATION_ENVELOPE_DECAY]);
+        return @as(i32, @intCast(self.gs[GeneratorType.KEY_NUMBER_TO_MODULATION_ENVELOPE_DECAY]));
     }
 
     pub fn getDelayVolumeEnvelope(self: *const Self) f32 {
-        return SoundFontMath.centsToMultiplyingFactor(@intToFloat(f32, self.gs[GeneratorType.DELAY_VOLUME_ENVELOPE]));
+        return SoundFontMath.centsToMultiplyingFactor(@as(f32, @floatFromInt(self.gs[GeneratorType.DELAY_VOLUME_ENVELOPE])));
     }
 
     pub fn getAttackVolumeEnvelope(self: *const Self) f32 {
-        return SoundFontMath.centsToMultiplyingFactor(@intToFloat(f32, self.gs[GeneratorType.ATTACK_VOLUME_ENVELOPE]));
+        return SoundFontMath.centsToMultiplyingFactor(@as(f32, @floatFromInt(self.gs[GeneratorType.ATTACK_VOLUME_ENVELOPE])));
     }
 
     pub fn getHoldVolumeEnvelope(self: *const Self) f32 {
-        return SoundFontMath.centsToMultiplyingFactor(@intToFloat(f32, self.gs[GeneratorType.HOLD_VOLUME_ENVELOPE]));
+        return SoundFontMath.centsToMultiplyingFactor(@as(f32, @floatFromInt(self.gs[GeneratorType.HOLD_VOLUME_ENVELOPE])));
     }
 
     pub fn getDecayVolumeEnvelope(self: *const Self) f32 {
-        return SoundFontMath.centsToMultiplyingFactor(@intToFloat(f32, self.gs[GeneratorType.DECAY_VOLUME_ENVELOPE]));
+        return SoundFontMath.centsToMultiplyingFactor(@as(f32, @floatFromInt(self.gs[GeneratorType.DECAY_VOLUME_ENVELOPE])));
     }
 
     pub fn getSustainVolumeEnvelope(self: *const Self) f32 {
-        return 0.1 * @intToFloat(f32, self.gs[GeneratorType.SUSTAIN_VOLUME_ENVELOPE]);
+        return 0.1 * @as(f32, @floatFromInt(self.gs[GeneratorType.SUSTAIN_VOLUME_ENVELOPE]));
     }
 
     pub fn getReleaseVolumeEnvelope(self: *const Self) f32 {
-        return SoundFontMath.centsToMultiplyingFactor(@intToFloat(f32, self.gs[GeneratorType.RELEASE_VOLUME_ENVELOPE]));
+        return SoundFontMath.centsToMultiplyingFactor(@as(f32, @floatFromInt(self.gs[GeneratorType.RELEASE_VOLUME_ENVELOPE])));
     }
 
     pub fn getKeyNumberToVolumeEnvelopeHold(self: *const Self) i32 {
-        return @intCast(i32, self.gs[GeneratorType.KEY_NUMBER_TO_VOLUME_ENVELOPE_HOLD]);
+        return @as(i32, @intCast(self.gs[GeneratorType.KEY_NUMBER_TO_VOLUME_ENVELOPE_HOLD]));
     }
 
     pub fn getKeyNumberToVolumeEnvelopeDecay(self: *const Self) i32 {
-        return @intCast(i32, self.gs[GeneratorType.KEY_NUMBER_TO_VOLUME_ENVELOPE_DECAY]);
+        return @as(i32, @intCast(self.gs[GeneratorType.KEY_NUMBER_TO_VOLUME_ENVELOPE_DECAY]));
     }
 
     pub fn getKeyRangeStart(self: *const Self) i32 {
-        return @intCast(i32, self.gs[GeneratorType.KEY_RANGE]) & 0xFF;
+        return @as(i32, @intCast(self.gs[GeneratorType.KEY_RANGE])) & 0xFF;
     }
 
     pub fn getKeyRangeEnd(self: *const Self) i32 {
-        return (@intCast(i32, self.gs[GeneratorType.KEY_RANGE]) >> 8) & 0xFF;
+        return (@as(i32, @intCast(self.gs[GeneratorType.KEY_RANGE])) >> 8) & 0xFF;
     }
 
     pub fn getVelocityRangeStart(self: *const Self) i32 {
-        return @intCast(i32, self.gs[GeneratorType.VELOCITY_RANGE]) & 0xFF;
+        return @as(i32, @intCast(self.gs[GeneratorType.VELOCITY_RANGE])) & 0xFF;
     }
 
     pub fn getVelocityRangeEnd(self: *const Self) i32 {
-        return (@intCast(i32, self.gs[GeneratorType.VELOCITY_RANGE]) >> 8) & 0xFF;
+        return (@as(i32, @intCast(self.gs[GeneratorType.VELOCITY_RANGE])) >> 8) & 0xFF;
     }
 
     pub fn getInitialAttenuation(self: *const Self) f32 {
-        return 0.1 * @intToFloat(f32, self.gs[GeneratorType.INITIAL_ATTENUATION]);
+        return 0.1 * @as(f32, @floatFromInt(self.gs[GeneratorType.INITIAL_ATTENUATION]));
     }
 
     pub fn getCoarseTune(self: *const Self) i32 {
-        return @intCast(i32, self.gs[GeneratorType.COARSE_TUNE]);
+        return @as(i32, @intCast(self.gs[GeneratorType.COARSE_TUNE]));
     }
 
     pub fn getFineTune(self: *const Self) i32 {
-        return @intCast(i32, self.gs[GeneratorType.FINE_TUNE]);
+        return @as(i32, @intCast(self.gs[GeneratorType.FINE_TUNE]));
     }
 
     pub fn getScaleTuning(self: *const Self) i32 {
-        return @intCast(i32, self.gs[GeneratorType.SCALE_TUNING]);
+        return @as(i32, @intCast(self.gs[GeneratorType.SCALE_TUNING]));
     }
 };
 
@@ -943,7 +935,6 @@ const PresetInfo = struct {
         }
 
         const count = size / 38;
-
         if (count <= 1) {
             return ZiggySynthError.InvalidSoundFont;
         }
@@ -951,18 +942,12 @@ const PresetInfo = struct {
         var presets = try allocator.alloc(Self, count);
         errdefer allocator.free(presets);
 
-        {
-            var i: usize = 0;
-            while (i < count) : (i += 1) {
-                presets[i] = try PresetInfo.init(reader);
-            }
+        for (0..count) |i| {
+            presets[i] = try PresetInfo.init(reader);
         }
 
-        {
-            var i: usize = 0;
-            while (i < count - 1) : (i += 1) {
-                presets[i].zone_end_index = presets[i + 1].zone_start_index;
-            }
+        for (0..count - 1) |i| {
+            presets[i].zone_end_index = presets[i + 1].zone_start_index;
         }
 
         return presets;
@@ -989,9 +974,8 @@ pub const Instrument = struct {
         var instruments = try allocator.alloc(Self, instrument_count);
         errdefer allocator.free(instruments);
 
-        var instrument_index: usize = 0;
         var region_index: usize = 0;
-        while (instrument_index < instrument_count) : (instrument_index += 1) {
+        for (0..instrument_count) |instrument_index| {
             const info = infos[instrument_index];
             const zones = all_zones[info.zone_start_index..info.zone_end_index];
 
@@ -1041,9 +1025,7 @@ pub const InstrumentRegion = struct {
         const instrument_count = infos.len - 1;
 
         var sum: usize = 0;
-
-        var instrument_index: usize = 0;
-        while (instrument_index < instrument_count) : (instrument_index += 1) {
+        for (0..instrument_count) |instrument_index| {
             const info = infos[instrument_index];
             const zones = all_zones[info.zone_start_index..info.zone_end_index];
 
@@ -1099,7 +1081,7 @@ pub const InstrumentRegion = struct {
             setParameter(&gs, &value);
         }
 
-        const id = @intCast(usize, gs[GeneratorType.SAMPLE_ID]);
+        const id: usize = @intCast(gs[GeneratorType.SAMPLE_ID]);
         if (id >= samples.len) {
             return ZiggySynthError.InvalidSoundFont;
         }
@@ -1119,23 +1101,20 @@ pub const InstrumentRegion = struct {
         errdefer allocator.free(regions);
         var region_index: usize = 0;
 
-        var instrument_index: usize = 0;
-        while (instrument_index < instrument_count) : (instrument_index += 1) {
+        for (0..instrument_count) |instrument_index| {
             const info = infos[instrument_index];
             const zones = all_zones[info.zone_start_index..info.zone_end_index];
 
             // Is the first one the global zone?
             if (InstrumentRegion.containsGlobalZone(zones)) {
                 // The first one is the global zone.
-                var i: usize = 0;
-                while (i < zones.len - 1) : (i += 1) {
+                for (0..zones.len - 1) |i| {
                     regions[region_index] = try InstrumentRegion.init(&zones[0], &zones[i + 1], samples);
                     region_index += 1;
                 }
             } else {
                 // No global zone.
-                var i: usize = 0;
-                while (i < zones.len) : (i += 1) {
+                for (0..zones.len) |i| {
                     regions[region_index] = try InstrumentRegion.init(&Zone.empty(), &zones[i], samples);
                     region_index += 1;
                 }
@@ -1172,171 +1151,171 @@ pub const InstrumentRegion = struct {
     }
 
     pub fn getStartAddressOffset(self: *const Self) i32 {
-        return 32768 * @intCast(i32, self.gs[GeneratorType.START_ADDRESS_COARSE_OFFSET]) + @intCast(i32, self.gs[GeneratorType.START_ADDRESS_OFFSET]);
+        return 32768 * @as(i32, @intCast(self.gs[GeneratorType.START_ADDRESS_COARSE_OFFSET])) + @as(i32, @intCast(self.gs[GeneratorType.START_ADDRESS_OFFSET]));
     }
 
     pub fn getEndAddressOffset(self: *const Self) i32 {
-        return 32768 * @intCast(i32, self.gs[GeneratorType.END_ADDRESS_COARSE_OFFSET]) + @intCast(i32, self.gs[GeneratorType.END_ADDRESS_OFFSET]);
+        return 32768 * @as(i32, @intCast(self.gs[GeneratorType.END_ADDRESS_COARSE_OFFSET])) + @as(i32, @intCast(self.gs[GeneratorType.END_ADDRESS_OFFSET]));
     }
 
     pub fn getStartLoopAddressOffset(self: *const Self) i32 {
-        return 32768 * @intCast(i32, self.gs[GeneratorType.START_LOOP_ADDRESS_COARSE_OFFSET]) + @intCast(i32, self.gs[GeneratorType.START_LOOP_ADDRESS_OFFSET]);
+        return 32768 * @as(i32, @intCast(self.gs[GeneratorType.START_LOOP_ADDRESS_COARSE_OFFSET])) + @as(i32, @intCast(self.gs[GeneratorType.START_LOOP_ADDRESS_OFFSET]));
     }
 
     pub fn getEndLoopAddressOffset(self: *const Self) i32 {
-        return 32768 * @intCast(i32, self.gs[GeneratorType.END_LOOP_ADDRESS_COARSE_OFFSET]) + @intCast(i32, self.gs[GeneratorType.END_LOOP_ADDRESS_OFFSET]);
+        return 32768 * @as(i32, @intCast(self.gs[GeneratorType.END_LOOP_ADDRESS_COARSE_OFFSET])) + @as(i32, @intCast(self.gs[GeneratorType.END_LOOP_ADDRESS_OFFSET]));
     }
 
     pub fn getModulationLfoToPitch(self: *const Self) i32 {
-        return @intCast(i32, self.gs[GeneratorType.MODULATION_LFO_TO_PITCH]);
+        return @as(i32, @intCast(self.gs[GeneratorType.MODULATION_LFO_TO_PITCH]));
     }
 
     pub fn getVibratoLfoToPitch(self: *const Self) i32 {
-        return @intCast(i32, self.gs[GeneratorType.VIBRATO_LFO_TO_PITCH]);
+        return @as(i32, @intCast(self.gs[GeneratorType.VIBRATO_LFO_TO_PITCH]));
     }
 
     pub fn getModulationEnvelopeToPitch(self: *const Self) i32 {
-        return @intCast(i32, self.gs[GeneratorType.MODULATION_ENVELOPE_TO_PITCH]);
+        return @as(i32, @intCast(self.gs[GeneratorType.MODULATION_ENVELOPE_TO_PITCH]));
     }
 
     pub fn getInitialFilterCutoffFrequency(self: *const Self) f32 {
-        return SoundFontMath.centsToHertz(@intToFloat(f32, self.gs[GeneratorType.INITIAL_FILTER_CUTOFF_FREQUENCY]));
+        return SoundFontMath.centsToHertz(@as(f32, @floatFromInt(self.gs[GeneratorType.INITIAL_FILTER_CUTOFF_FREQUENCY])));
     }
 
     pub fn getInitialFilterQ(self: *const Self) f32 {
-        return 0.1 * @intToFloat(f32, self.gs[GeneratorType.INITIAL_FILTER_Q]);
+        return 0.1 * @as(f32, @floatFromInt(self.gs[GeneratorType.INITIAL_FILTER_Q]));
     }
 
     pub fn getModulationLfoToFilterCutoffFrequency(self: *const Self) i32 {
-        return @intCast(i32, self.gs[GeneratorType.MODULATION_LFO_TO_FILTER_CUTOFF_FREQUENCY]);
+        return @as(i32, @intCast(self.gs[GeneratorType.MODULATION_LFO_TO_FILTER_CUTOFF_FREQUENCY]));
     }
 
     pub fn getModulationEnvelopeToFilterCutoffFrequency(self: *const Self) i32 {
-        return @intCast(i32, self.gs[GeneratorType.MODULATION_ENVELOPE_TO_FILTER_CUTOFF_FREQUENCY]);
+        return @as(i32, @intCast(self.gs[GeneratorType.MODULATION_ENVELOPE_TO_FILTER_CUTOFF_FREQUENCY]));
     }
 
     pub fn getModulationLfoToVolume(self: *const Self) f32 {
-        return 0.1 * @intToFloat(f32, self.gs[GeneratorType.MODULATION_LFO_TO_VOLUME]);
+        return 0.1 * @as(f32, @floatFromInt(self.gs[GeneratorType.MODULATION_LFO_TO_VOLUME]));
     }
 
     pub fn getChorusEffectsSend(self: *const Self) f32 {
-        return 0.1 * @intToFloat(f32, self.gs[GeneratorType.CHORUS_EFFECTS_SEND]);
+        return 0.1 * @as(f32, @floatFromInt(self.gs[GeneratorType.CHORUS_EFFECTS_SEND]));
     }
 
     pub fn getReverbEffectsSend(self: *const Self) f32 {
-        return 0.1 * @intToFloat(f32, self.gs[GeneratorType.REVERB_EFFECTS_SEND]);
+        return 0.1 * @as(f32, @floatFromInt(self.gs[GeneratorType.REVERB_EFFECTS_SEND]));
     }
 
     pub fn getPan(self: *const Self) f32 {
-        return 0.1 * @intToFloat(f32, self.gs[GeneratorType.PAN]);
+        return 0.1 * @as(f32, @floatFromInt(self.gs[GeneratorType.PAN]));
     }
 
     pub fn getDelayModulationLfo(self: *const Self) f32 {
-        return SoundFontMath.timecentsToSeconds(@intToFloat(f32, self.gs[GeneratorType.DELAY_MODULATION_LFO]));
+        return SoundFontMath.timecentsToSeconds(@as(f32, @floatFromInt(self.gs[GeneratorType.DELAY_MODULATION_LFO])));
     }
 
     pub fn getFrequencyModulationLfo(self: *const Self) f32 {
-        return SoundFontMath.centsToHertz(@intToFloat(f32, self.gs[GeneratorType.FREQUENCY_MODULATION_LFO]));
+        return SoundFontMath.centsToHertz(@as(f32, @floatFromInt(self.gs[GeneratorType.FREQUENCY_MODULATION_LFO])));
     }
 
     pub fn getDelayVibratoLfo(self: *const Self) f32 {
-        return SoundFontMath.timecentsToSeconds(@intToFloat(f32, self.gs[GeneratorType.DELAY_VIBRATO_LFO]));
+        return SoundFontMath.timecentsToSeconds(@as(f32, @floatFromInt(self.gs[GeneratorType.DELAY_VIBRATO_LFO])));
     }
 
     pub fn getFrequencyVibratoLfo(self: *const Self) f32 {
-        return SoundFontMath.centsToHertz(@intToFloat(f32, self.gs[GeneratorType.FREQUENCY_VIBRATO_LFO]));
+        return SoundFontMath.centsToHertz(@as(f32, @floatFromInt(self.gs[GeneratorType.FREQUENCY_VIBRATO_LFO])));
     }
 
     pub fn getDelayModulationEnvelope(self: *const Self) f32 {
-        return SoundFontMath.timecentsToSeconds(@intToFloat(f32, self.gs[GeneratorType.DELAY_MODULATION_ENVELOPE]));
+        return SoundFontMath.timecentsToSeconds(@as(f32, @floatFromInt(self.gs[GeneratorType.DELAY_MODULATION_ENVELOPE])));
     }
 
     pub fn getAttackModulationEnvelope(self: *const Self) f32 {
-        return SoundFontMath.timecentsToSeconds(@intToFloat(f32, self.gs[GeneratorType.ATTACK_MODULATION_ENVELOPE]));
+        return SoundFontMath.timecentsToSeconds(@as(f32, @floatFromInt(self.gs[GeneratorType.ATTACK_MODULATION_ENVELOPE])));
     }
 
     pub fn getHoldModulationEnvelope(self: *const Self) f32 {
-        return SoundFontMath.timecentsToSeconds(@intToFloat(f32, self.gs[GeneratorType.HOLD_MODULATION_ENVELOPE]));
+        return SoundFontMath.timecentsToSeconds(@as(f32, @floatFromInt(self.gs[GeneratorType.HOLD_MODULATION_ENVELOPE])));
     }
 
     pub fn getDecayModulationEnvelope(self: *const Self) f32 {
-        return SoundFontMath.timecentsToSeconds(@intToFloat(f32, self.gs[GeneratorType.DECAY_MODULATION_ENVELOPE]));
+        return SoundFontMath.timecentsToSeconds(@as(f32, @floatFromInt(self.gs[GeneratorType.DECAY_MODULATION_ENVELOPE])));
     }
 
     pub fn getSustainModulationEnvelope(self: *const Self) f32 {
-        return 0.1 * @intToFloat(f32, self.gs[GeneratorType.SUSTAIN_MODULATION_ENVELOPE]);
+        return 0.1 * @as(f32, @floatFromInt(self.gs[GeneratorType.SUSTAIN_MODULATION_ENVELOPE]));
     }
 
     pub fn getReleaseModulationEnvelope(self: *const Self) f32 {
-        return SoundFontMath.timecentsToSeconds(@intToFloat(f32, self.gs[GeneratorType.RELEASE_MODULATION_ENVELOPE]));
+        return SoundFontMath.timecentsToSeconds(@as(f32, @floatFromInt(self.gs[GeneratorType.RELEASE_MODULATION_ENVELOPE])));
     }
 
     pub fn getKeyNumberToModulationEnvelopeHold(self: *const Self) i32 {
-        return @intCast(i32, self.gs[GeneratorType.KEY_NUMBER_TO_MODULATION_ENVELOPE_HOLD]);
+        return @as(i32, @intCast(self.gs[GeneratorType.KEY_NUMBER_TO_MODULATION_ENVELOPE_HOLD]));
     }
 
     pub fn getKeyNumberToModulationEnvelopeDecay(self: *const Self) i32 {
-        return @intCast(i32, self.gs[GeneratorType.KEY_NUMBER_TO_MODULATION_ENVELOPE_DECAY]);
+        return @as(i32, @intCast(self.gs[GeneratorType.KEY_NUMBER_TO_MODULATION_ENVELOPE_DECAY]));
     }
 
     pub fn getDelayVolumeEnvelope(self: *const Self) f32 {
-        return SoundFontMath.timecentsToSeconds(@intToFloat(f32, self.gs[GeneratorType.DELAY_VOLUME_ENVELOPE]));
+        return SoundFontMath.timecentsToSeconds(@as(f32, @floatFromInt(self.gs[GeneratorType.DELAY_VOLUME_ENVELOPE])));
     }
 
     pub fn getAttackVolumeEnvelope(self: *const Self) f32 {
-        return SoundFontMath.timecentsToSeconds(@intToFloat(f32, self.gs[GeneratorType.ATTACK_VOLUME_ENVELOPE]));
+        return SoundFontMath.timecentsToSeconds(@as(f32, @floatFromInt(self.gs[GeneratorType.ATTACK_VOLUME_ENVELOPE])));
     }
 
     pub fn getHoldVolumeEnvelope(self: *const Self) f32 {
-        return SoundFontMath.timecentsToSeconds(@intToFloat(f32, self.gs[GeneratorType.HOLD_VOLUME_ENVELOPE]));
+        return SoundFontMath.timecentsToSeconds(@as(f32, @floatFromInt(self.gs[GeneratorType.HOLD_VOLUME_ENVELOPE])));
     }
 
     pub fn getDecayVolumeEnvelope(self: *const Self) f32 {
-        return SoundFontMath.timecentsToSeconds(@intToFloat(f32, self.gs[GeneratorType.DECAY_VOLUME_ENVELOPE]));
+        return SoundFontMath.timecentsToSeconds(@as(f32, @floatFromInt(self.gs[GeneratorType.DECAY_VOLUME_ENVELOPE])));
     }
 
     pub fn getSustainVolumeEnvelope(self: *const Self) f32 {
-        return 0.1 * @intToFloat(f32, self.gs[GeneratorType.SUSTAIN_VOLUME_ENVELOPE]);
+        return 0.1 * @as(f32, @floatFromInt(self.gs[GeneratorType.SUSTAIN_VOLUME_ENVELOPE]));
     }
 
     pub fn getReleaseVolumeEnvelope(self: *const Self) f32 {
-        return SoundFontMath.timecentsToSeconds(@intToFloat(f32, self.gs[GeneratorType.RELEASE_VOLUME_ENVELOPE]));
+        return SoundFontMath.timecentsToSeconds(@as(f32, @floatFromInt(self.gs[GeneratorType.RELEASE_VOLUME_ENVELOPE])));
     }
 
     pub fn getKeyNumberToVolumeEnvelopeHold(self: *const Self) i32 {
-        return @intCast(i32, self.gs[GeneratorType.KEY_NUMBER_TO_VOLUME_ENVELOPE_HOLD]);
+        return @as(i32, @intCast(self.gs[GeneratorType.KEY_NUMBER_TO_VOLUME_ENVELOPE_HOLD]));
     }
 
     pub fn getKeyNumberToVolumeEnvelopeDecay(self: *const Self) i32 {
-        return @intCast(i32, self.gs[GeneratorType.KEY_NUMBER_TO_VOLUME_ENVELOPE_DECAY]);
+        return @as(i32, @intCast(self.gs[GeneratorType.KEY_NUMBER_TO_VOLUME_ENVELOPE_DECAY]));
     }
 
     pub fn getKeyRangeStart(self: *const Self) i32 {
-        return @intCast(i32, self.gs[GeneratorType.KEY_RANGE]) & 0xFF;
+        return @as(i32, @intCast(self.gs[GeneratorType.KEY_RANGE])) & 0xFF;
     }
 
     pub fn getKeyRangeEnd(self: *const Self) i32 {
-        return (@intCast(i32, self.gs[GeneratorType.KEY_RANGE]) >> 8) & 0xFF;
+        return (@as(i32, @intCast(self.gs[GeneratorType.KEY_RANGE])) >> 8) & 0xFF;
     }
 
     pub fn getVelocityRangeStart(self: *const Self) i32 {
-        return @intCast(i32, self.gs[GeneratorType.VELOCITY_RANGE]) & 0xFF;
+        return @as(i32, @intCast(self.gs[GeneratorType.VELOCITY_RANGE])) & 0xFF;
     }
 
     pub fn getVelocityRangeEnd(self: *const Self) i32 {
-        return (@intCast(i32, self.gs[GeneratorType.VELOCITY_RANGE]) >> 8) & 0xFF;
+        return (@as(i32, @intCast(self.gs[GeneratorType.VELOCITY_RANGE])) >> 8) & 0xFF;
     }
 
     pub fn getInitialAttenuation(self: *const Self) f32 {
-        return 0.1 * @intToFloat(f32, self.gs[GeneratorType.INITIAL_ATTENUATION]);
+        return 0.1 * @as(f32, @floatFromInt(self.gs[GeneratorType.INITIAL_ATTENUATION]));
     }
 
     pub fn getCoarseTune(self: *const Self) i32 {
-        return @intCast(i32, self.gs[GeneratorType.COARSE_TUNE]);
+        return @as(i32, @intCast(self.gs[GeneratorType.COARSE_TUNE]));
     }
 
     pub fn getFineTune(self: *const Self) i32 {
-        return @intCast(i32, self.gs[GeneratorType.FINE_TUNE]) + self.sample.pitch_correction;
+        return @as(i32, @intCast(self.gs[GeneratorType.FINE_TUNE])) + self.sample.pitch_correction;
     }
 
     pub fn getSampleModes(self: *const Self) i32 {
@@ -1344,11 +1323,11 @@ pub const InstrumentRegion = struct {
     }
 
     pub fn getScaleTuning(self: *const Self) i32 {
-        return @intCast(i32, self.gs[GeneratorType.SCALE_TUNING]);
+        return @as(i32, @intCast(self.gs[GeneratorType.SCALE_TUNING]));
     }
 
     pub fn getExclusiveClass(self: *const Self) i32 {
-        return @intCast(i32, self.gs[GeneratorType.EXCLUSIVE_CLASS]);
+        return @as(i32, @intCast(self.gs[GeneratorType.EXCLUSIVE_CLASS]));
     }
 
     pub fn getRootKey(self: *const Self) i32 {
@@ -1380,7 +1359,6 @@ const InstrumentInfo = struct {
         }
 
         const count = size / 22;
-
         if (count <= 1) {
             return ZiggySynthError.InvalidSoundFont;
         }
@@ -1388,18 +1366,12 @@ const InstrumentInfo = struct {
         var instruments = try allocator.alloc(Self, count);
         errdefer allocator.free(instruments);
 
-        {
-            var i: usize = 0;
-            while (i < count) : (i += 1) {
-                instruments[i] = try InstrumentInfo.init(reader);
-            }
+        for (0..count) |i| {
+            instruments[i] = try InstrumentInfo.init(reader);
         }
 
-        {
-            var i: usize = 0;
-            while (i < count - 1) : (i += 1) {
-                instruments[i].zone_end_index = instruments[i + 1].zone_start_index;
-            }
+        for (0..count - 1) |i| {
+            instruments[i].zone_end_index = instruments[i + 1].zone_start_index;
         }
 
         return instruments;
@@ -1452,7 +1424,6 @@ pub const SampleHeader = struct {
         }
 
         const count = size / 46 - 1;
-
         if (count <= 1) {
             return ZiggySynthError.InvalidSoundFont;
         }
@@ -1460,8 +1431,7 @@ pub const SampleHeader = struct {
         var headers = try allocator.alloc(Self, count);
         errdefer allocator.free(headers);
 
-        var i: usize = 0;
-        while (i < count) : (i += 1) {
+        for (0..count) |i| {
             headers[i] = try SampleHeader.init(reader);
         }
 
@@ -1481,18 +1451,16 @@ const LoopMode = struct {
 pub const Synthesizer = struct {
     const Self = @This();
 
-    const CHANNEL_COUNT: i32 = 16;
-    const PERCUSSION_CHANNEL: i32 = 9;
+    const CHANNEL_COUNT: usize = 16;
+    const PERCUSSION_CHANNEL: usize = 9;
 
     allocator: Allocator,
 
-    sound_font: SoundFont,
+    sound_font: *const SoundFont,
     sample_rate: i32,
-    block_size: i32,
-    maximum_polyphony: i32,
+    block_size: usize,
+    maximum_polyphony: usize,
     enable_reverb_and_chorus: bool,
-
-    minimum_voice_length: i32,
 
     preset_lookup: AutoHashMap(i32, *Preset),
     default_preset: *Preset,
@@ -1521,56 +1489,46 @@ pub const Synthesizer = struct {
     chorus_output_left: ?[]f32,
     chorus_output_right: ?[]f32,
 
-    pub fn init(allocator: Allocator, sound_font: SoundFont, settings: SynthesizerSettings) !Self {
+    pub fn init(allocator: Allocator, sound_font: *const SoundFont, settings: *const SynthesizerSettings) !Self {
         try settings.validate();
-
-        const minimum_voice_length = @divTrunc(settings.sample_rate, 500);
 
         var preset_lookup: AutoHashMap(i32, *Preset) = AutoHashMap(i32, *Preset).init(allocator);
         errdefer preset_lookup.deinit();
         var min_preset_id: i32 = math.maxInt(i32);
         var default_preset: ?*Preset = null;
-        {
-            var i: usize = 0;
-            while (i < sound_font.presets.len) : (i += 1) {
-                const preset = &sound_font.presets[i];
+        for (sound_font.presets) |*preset| {
+            // The preset ID is Int32, where the upper 16 bits represent the bank number
+            // and the lower 16 bits represent the patch number.
+            // This ID is used to search for presets by the combination of bank number
+            // and patch number.
+            const preset_id = (preset.getBankNumber() << 16) | preset.getPatchNumber();
+            try preset_lookup.put(preset_id, preset);
 
-                // The preset ID is Int32, where the upper 16 bits represent the bank number
-                // and the lower 16 bits represent the patch number.
-                // This ID is used to search for presets by the combination of bank number
-                // and patch number.
-                var preset_id = (preset.getBankNumber() << 16) | preset.getPatchNumber();
-                try preset_lookup.put(preset_id, preset);
-
-                // The preset with the minimum ID number will be default.
-                // If the SoundFont is GM compatible, the piano will be chosen.
-                if (preset_id < min_preset_id) {
-                    default_preset = preset;
-                    min_preset_id = preset_id;
-                }
+            // The preset with the minimum ID number will be default.
+            // If the SoundFont is GM compatible, the piano will be chosen.
+            if (preset_id < min_preset_id) {
+                default_preset = preset;
+                min_preset_id = preset_id;
             }
         }
 
         var channels = mem.zeroes([Synthesizer.CHANNEL_COUNT]Channel);
-        {
-            var i: usize = 0;
-            while (i < channels.len) : (i += 1) {
-                channels[i] = Channel.init(i == Synthesizer.PERCUSSION_CHANNEL);
-            }
+        for (0..channels.len) |i| {
+            channels[i] = Channel.init(i == Synthesizer.PERCUSSION_CHANNEL);
         }
 
-        var voices = try VoiceCollection.init(allocator, &settings);
+        var voices = try VoiceCollection.init(allocator, settings);
         errdefer voices.deinit();
 
-        const block_left = try allocator.alloc(f32, @intCast(usize, settings.block_size));
+        const block_left = try allocator.alloc(f32, settings.block_size);
         errdefer allocator.free(block_left);
 
-        const block_right = try allocator.alloc(f32, @intCast(usize, settings.block_size));
+        const block_right = try allocator.alloc(f32, settings.block_size);
         errdefer allocator.free(block_right);
 
-        const inverse_block_size = 1.0 / @intToFloat(f32, settings.block_size);
+        const inverse_block_size = 1.0 / @as(f32, @floatFromInt(settings.block_size));
 
-        const block_read = @intCast(usize, settings.block_size);
+        const block_read = settings.block_size;
 
         const master_volume = 0.5;
 
@@ -1600,15 +1558,15 @@ pub const Synthesizer = struct {
 
         if (settings.enable_reverb_and_chorus) {
             reverb = try Reverb.init(allocator, settings.sample_rate);
-            reverb_input = try allocator.alloc(f32, @intCast(usize, settings.block_size));
-            reverb_output_left = try allocator.alloc(f32, @intCast(usize, settings.block_size));
-            reverb_output_right = try allocator.alloc(f32, @intCast(usize, settings.block_size));
+            reverb_input = try allocator.alloc(f32, settings.block_size);
+            reverb_output_left = try allocator.alloc(f32, settings.block_size);
+            reverb_output_right = try allocator.alloc(f32, settings.block_size);
 
             chorus = try Chorus.init(allocator, settings.sample_rate, 0.002, 0.0019, 0.4);
-            chorus_input_left = try allocator.alloc(f32, @intCast(usize, settings.block_size));
-            chorus_input_right = try allocator.alloc(f32, @intCast(usize, settings.block_size));
-            chorus_output_left = try allocator.alloc(f32, @intCast(usize, settings.block_size));
-            chorus_output_right = try allocator.alloc(f32, @intCast(usize, settings.block_size));
+            chorus_input_left = try allocator.alloc(f32, settings.block_size);
+            chorus_input_right = try allocator.alloc(f32, settings.block_size);
+            chorus_output_left = try allocator.alloc(f32, settings.block_size);
+            chorus_output_right = try allocator.alloc(f32, settings.block_size);
         }
 
         return Self{
@@ -1618,7 +1576,6 @@ pub const Synthesizer = struct {
             .block_size = settings.block_size,
             .maximum_polyphony = settings.maximum_polyphony,
             .enable_reverb_and_chorus = settings.enable_reverb_and_chorus,
-            .minimum_voice_length = minimum_voice_length,
             .preset_lookup = preset_lookup,
             .default_preset = default_preset.?,
             .channels = channels,
@@ -1665,7 +1622,7 @@ pub const Synthesizer = struct {
             return;
         }
 
-        var channel_info = &self.channels[@intCast(usize, channel)];
+        var channel_info = &self.channels[@intCast(channel)];
 
         switch (command) {
             0x80 => self.noteOff(channel, data1), // Note Off
@@ -1704,9 +1661,7 @@ pub const Synthesizer = struct {
             return;
         }
 
-        var i: usize = 0;
-        while (i < self.voices.active_voice_count) : (i += 1) {
-            var voice = &self.voices.voices[i];
+        for (self.voices.getActiveVoices()) |*voice| {
             if (voice.channel == channel and voice.key == key) {
                 voice.end();
             }
@@ -1723,7 +1678,7 @@ pub const Synthesizer = struct {
             return;
         }
 
-        var channel_info = &self.channels[@intCast(usize, channel)];
+        var channel_info = &self.channels[@intCast(channel)];
 
         const preset_id = (channel_info.getBankNumber() << 16) | channel_info.getPatchNumber();
 
@@ -1734,7 +1689,7 @@ pub const Synthesizer = struct {
             // Try fallback to the GM sound set.
             // Normally, the given patch number + the bank number 0 will work.
             // For drums (bank number >= 128), it seems to be better to select the standard set (128:0).
-            var gm_preset_id = if (channel_info.getBankNumber() < 128) channel_info.getPatchNumber() else (128 << 16);
+            const gm_preset_id = if (channel_info.getBankNumber() < 128) channel_info.getPatchNumber() else (128 << 16);
             if (self.preset_lookup.get(gm_preset_id)) |value| {
                 preset = value;
             } else {
@@ -1743,14 +1698,10 @@ pub const Synthesizer = struct {
             }
         }
 
-        var pr: usize = 0;
-        while (pr < preset.regions.len) : (pr += 1) {
-            const preset_region = &preset.regions[pr];
+        for (preset.regions) |*preset_region| {
             if (preset_region.contains(key, velocity)) {
                 const instrument = preset_region.instrument;
-                var ir: usize = 0;
-                while (ir < instrument.regions.len) : (ir += 1) {
-                    const instrument_region = &instrument.regions[ir];
+                for (instrument.regions) |*instrument_region| {
                     if (instrument_region.contains(key, velocity)) {
                         var region_pair = RegionPair.init(preset_region, instrument_region);
 
@@ -1767,26 +1718,21 @@ pub const Synthesizer = struct {
         if (immediate) {
             self.voices.clear();
         } else {
-            var i: usize = 0;
-            while (i < self.voices.active_voice_count) : (i += 1) {
-                self.voices.voices[i].end();
+            for (self.voices.getActiveVoices()) |*voice| {
+                voice.end();
             }
         }
     }
 
     pub fn noteOffAllChannel(self: *Self, channel: i32, immediate: bool) void {
         if (immediate) {
-            var i: usize = 0;
-            while (i < self.voices.active_voice_count) : (i += 1) {
-                var voice = &self.voices.voices[i];
+            for (self.voices.getActiveVoices()) |*voice| {
                 if (voice.channel == channel) {
                     voice.kill();
                 }
             }
         } else {
-            var i: usize = 0;
-            while (i < self.voices.active_voice_count) : (i += 1) {
-                var voice = &self.voices.voices[i];
+            for (self.voices.getActiveVoices()) |*voice| {
                 if (voice.channel == channel) {
                     voice.end();
                 }
@@ -1795,9 +1741,8 @@ pub const Synthesizer = struct {
     }
 
     pub fn resetAllControllers(self: *Self) void {
-        var i: usize = 0;
-        while (i < self.channels.len) : (i += 1) {
-            self.channels[i].resetAllControllers();
+        for (&self.channels) |*channel| {
+            channel.resetAllControllers();
         }
     }
 
@@ -1806,15 +1751,14 @@ pub const Synthesizer = struct {
             return;
         }
 
-        self.channels[@intCast(usize, channel)].resetAllControllers();
+        self.channels[@intCast(channel)].resetAllControllers();
     }
 
     pub fn reset(self: *Self) void {
         self.voices.clear();
 
-        var i: usize = 0;
-        while (i < self.channels.len) : (i += 1) {
-            self.channels[i].reset();
+        for (&self.channels) |*channel| {
+            channel.reset();
         }
 
         if (self.enable_reverb_and_chorus) {
@@ -1822,7 +1766,7 @@ pub const Synthesizer = struct {
             self.chorus.?.mute();
         }
 
-        self.block_read = @intCast(usize, self.block_size);
+        self.block_read = self.block_size;
     }
 
     pub fn render(self: *Self, left: []f32, right: []f32) void {
@@ -1837,14 +1781,15 @@ pub const Synthesizer = struct {
                 self.block_read = 0;
             }
 
-            const src_rem = @intCast(usize, self.block_size) - self.block_read;
+            const src_rem = self.block_size - self.block_read;
             const dst_rem = left.len - wrote;
             const rem = @min(src_rem, dst_rem);
 
-            var t: usize = 0;
-            while (t < rem) : (t += 1) {
-                left[wrote + t] = self.block_left[self.block_read + t];
-                right[wrote + t] = self.block_right[self.block_read + t];
+            for (left[wrote .. wrote + rem], self.block_left[self.block_read .. self.block_read + rem]) |*dst, value| {
+                dst.* = value;
+            }
+            for (right[wrote .. wrote + rem], self.block_right[self.block_read .. self.block_read + rem]) |*dst, value| {
+                dst.* = value;
             }
 
             self.block_read += rem;
@@ -1853,78 +1798,54 @@ pub const Synthesizer = struct {
     }
 
     fn renderBlock(self: *Self) void {
-        const block_size = @intCast(usize, self.block_size);
-
         self.voices.processUnit(self);
 
-        {
-            var t: usize = 0;
-            while (t < block_size) : (t += 1) {
-                self.block_left[t] = 0.0;
-                self.block_right[t] = 0.0;
-            }
+        for (self.block_left, self.block_right) |*left, *right| {
+            left.* = 0.0;
+            right.* = 0.0;
         }
-
-        {
-            var i: usize = 0;
-            while (i < self.voices.active_voice_count) : (i += 1) {
-                const voice = &self.voices.voices[i];
-                const previous_gain_left = self.master_volume * voice.previous_mix_gain_left;
-                const current_gain_left = self.master_volume * voice.current_mix_gain_left;
-                self.writeBlock(previous_gain_left, current_gain_left, voice.block, self.block_left);
-                const previous_gain_right = self.master_volume * voice.previous_mix_gain_right;
-                const current_gain_right = self.master_volume * voice.current_mix_gain_right;
-                self.writeBlock(previous_gain_right, current_gain_right, voice.block, self.block_right);
-            }
+        for (self.voices.getActiveVoices()) |*voice| {
+            const previous_gain_left = self.master_volume * voice.previous_mix_gain_left;
+            const current_gain_left = self.master_volume * voice.current_mix_gain_left;
+            self.writeBlock(previous_gain_left, current_gain_left, voice.block, self.block_left);
+            const previous_gain_right = self.master_volume * voice.previous_mix_gain_right;
+            const current_gain_right = self.master_volume * voice.current_mix_gain_right;
+            self.writeBlock(previous_gain_right, current_gain_right, voice.block, self.block_right);
         }
 
         if (self.enable_reverb_and_chorus) {
             var chorus = &self.chorus.?;
-            var chorus_input_left = self.chorus_input_left.?;
-            var chorus_input_right = self.chorus_input_right.?;
-            var chorus_output_left = self.chorus_output_left.?;
-            var chorus_output_right = self.chorus_output_right.?;
-            {
-                var t: usize = 0;
-                while (t < block_size) : (t += 1) {
-                    chorus_input_left[t] = 0.0;
-                    chorus_input_right[t] = 0.0;
-                }
+            const chorus_input_left = self.chorus_input_left.?;
+            const chorus_input_right = self.chorus_input_right.?;
+            const chorus_output_left = self.chorus_output_left.?;
+            const chorus_output_right = self.chorus_output_right.?;
+            for (chorus_input_left, chorus_input_right) |*left, *right| {
+                left.* = 0.0;
+                right.* = 0.0;
             }
-            {
-                var i: usize = 0;
-                while (i < self.voices.active_voice_count) : (i += 1) {
-                    const voice = &self.voices.voices[i];
-                    const previous_gain_left = voice.previous_chorus_send * voice.previous_mix_gain_left;
-                    const current_gain_left = voice.current_chorus_send * voice.current_mix_gain_left;
-                    self.writeBlock(previous_gain_left, current_gain_left, voice.block, chorus_input_left);
-                    const previous_gain_right = voice.previous_chorus_send * voice.previous_mix_gain_right;
-                    const current_gain_right = voice.current_chorus_send * voice.current_mix_gain_right;
-                    self.writeBlock(previous_gain_right, current_gain_right, voice.block, chorus_input_right);
-                }
+            for (self.voices.getActiveVoices()) |*voice| {
+                const previous_gain_left = voice.previous_chorus_send * voice.previous_mix_gain_left;
+                const current_gain_left = voice.current_chorus_send * voice.current_mix_gain_left;
+                self.writeBlock(previous_gain_left, current_gain_left, voice.block, chorus_input_left);
+                const previous_gain_right = voice.previous_chorus_send * voice.previous_mix_gain_right;
+                const current_gain_right = voice.current_chorus_send * voice.current_mix_gain_right;
+                self.writeBlock(previous_gain_right, current_gain_right, voice.block, chorus_input_right);
             }
             chorus.process(chorus_input_left, chorus_input_right, chorus_output_left, chorus_output_right);
             ArrayMath.multiplyAdd(self.master_volume, chorus_output_left, self.block_left);
             ArrayMath.multiplyAdd(self.master_volume, chorus_output_right, self.block_right);
 
             var reverb = &self.reverb.?;
-            var reverb_input = self.reverb_input.?;
-            var reverb_output_left = self.reverb_output_left.?;
-            var reverb_output_right = self.reverb_output_right.?;
-            {
-                var t: usize = 0;
-                while (t < block_size) : (t += 1) {
-                    reverb_input[t] = 0.0;
-                }
+            const reverb_input = self.reverb_input.?;
+            const reverb_output_left = self.reverb_output_left.?;
+            const reverb_output_right = self.reverb_output_right.?;
+            for (reverb_input) |*value| {
+                value.* = 0.0;
             }
-            {
-                var i: usize = 0;
-                while (i < self.voices.active_voice_count) : (i += 1) {
-                    const voice = &self.voices.voices[i];
-                    const previous_gain = reverb.getInputGain() * voice.previous_reverb_send * (voice.previous_mix_gain_left + voice.previous_mix_gain_right);
-                    const current_gain = reverb.getInputGain() * voice.current_reverb_send * (voice.current_mix_gain_left + voice.current_mix_gain_right);
-                    self.writeBlock(previous_gain, current_gain, voice.block, reverb_input);
-                }
+            for (self.voices.getActiveVoices()) |*voice| {
+                const previous_gain = reverb.getInputGain() * voice.previous_reverb_send * (voice.previous_mix_gain_left + voice.previous_mix_gain_right);
+                const current_gain = reverb.getInputGain() * voice.current_reverb_send * (voice.current_mix_gain_left + voice.current_mix_gain_right);
+                self.writeBlock(previous_gain, current_gain, voice.block, reverb_input);
             }
             reverb.process(reverb_input, reverb_output_left, reverb_output_right);
             ArrayMath.multiplyAdd(self.master_volume, reverb_output_left, self.block_left);
@@ -1937,7 +1858,7 @@ pub const Synthesizer = struct {
             return;
         }
 
-        if (@fabs(current_gain - previous_gain) < 1.0E-3) {
+        if (@abs(current_gain - previous_gain) < 1.0E-3) {
             ArrayMath.multiplyAdd(current_gain, source, destination);
         } else {
             const step = self.inverse_block_size * (current_gain - previous_gain);
@@ -1950,12 +1871,12 @@ pub const SynthesizerSettings = struct {
     const Self = @This();
 
     const DEFAULT_BLOCK_SIZE: i32 = 64;
-    const DEFAULT_MAXIMUM_POLYPHONY: i32 = 64;
+    const DEFAULT_MAXIMUM_POLYPHONY: usize = 64;
     const DEFAULT_ENABLE_REVERB_AND_CHORUS: bool = true;
 
     sample_rate: i32,
-    block_size: i32,
-    maximum_polyphony: i32,
+    block_size: usize,
+    maximum_polyphony: usize,
     enable_reverb_and_chorus: bool,
 
     pub fn init(sample_rate: i32) Self {
@@ -1979,13 +1900,13 @@ pub const SynthesizerSettings = struct {
         }
     }
 
-    fn checkBlockSize(value: i32) !void {
+    fn checkBlockSize(value: usize) !void {
         if (!(8 <= value and value <= 1024)) {
             return ZiggySynthError.BlockSizeIsOutOfRange;
         }
     }
 
-    fn checkMaximumPolyphony(value: i32) !void {
+    fn checkMaximumPolyphony(value: usize) !void {
         if (!(8 <= value and value <= 256)) {
             return ZiggySynthError.MaximumPolyphonyIsOutOfRange;
         }
@@ -2006,7 +1927,7 @@ const RegionPair = struct {
     }
 
     fn gs(self: *const Self, i: usize) i32 {
-        return @intCast(i32, self.preset.gs[i]) + @intCast(i32, self.instrument.gs[i]);
+        return @as(i32, @intCast(self.preset.gs[i])) + @as(i32, @intCast(self.instrument.gs[i]));
     }
 
     fn getSampleStart(self: *const Self) i32 {
@@ -2054,11 +1975,11 @@ const RegionPair = struct {
     }
 
     fn getInitialFilterCutoffFrequency(self: *const Self) f32 {
-        return SoundFontMath.centsToHertz(@intToFloat(f32, self.gs(GeneratorType.INITIAL_FILTER_CUTOFF_FREQUENCY)));
+        return SoundFontMath.centsToHertz(@as(f32, @floatFromInt(self.gs(GeneratorType.INITIAL_FILTER_CUTOFF_FREQUENCY))));
     }
 
     fn getInitialFilterQ(self: *const Self) f32 {
-        return 0.1 * @intToFloat(f32, self.gs(GeneratorType.INITIAL_FILTER_Q));
+        return 0.1 * @as(f32, @floatFromInt(self.gs(GeneratorType.INITIAL_FILTER_Q)));
     }
 
     fn getModulationLfoToFilterCutoffFrequency(self: *const Self) i32 {
@@ -2070,59 +1991,59 @@ const RegionPair = struct {
     }
 
     fn getModulationLfoToVolume(self: *const Self) f32 {
-        return 0.1 * @intToFloat(f32, self.gs(GeneratorType.MODULATION_LFO_TO_VOLUME));
+        return 0.1 * @as(f32, @floatFromInt(self.gs(GeneratorType.MODULATION_LFO_TO_VOLUME)));
     }
 
     fn getChorusEffectsSend(self: *const Self) f32 {
-        return 0.1 * @intToFloat(f32, self.gs(GeneratorType.CHORUS_EFFECTS_SEND));
+        return 0.1 * @as(f32, @floatFromInt(self.gs(GeneratorType.CHORUS_EFFECTS_SEND)));
     }
 
     fn getReverbEffectsSend(self: *const Self) f32 {
-        return 0.1 * @intToFloat(f32, self.gs(GeneratorType.REVERB_EFFECTS_SEND));
+        return 0.1 * @as(f32, @floatFromInt(self.gs(GeneratorType.REVERB_EFFECTS_SEND)));
     }
 
     fn getPan(self: *const Self) f32 {
-        return 0.1 * @intToFloat(f32, self.gs(GeneratorType.PAN));
+        return 0.1 * @as(f32, @floatFromInt(self.gs(GeneratorType.PAN)));
     }
 
     fn getDelayModulationLfo(self: *const Self) f32 {
-        return SoundFontMath.timecentsToSeconds(@intToFloat(f32, self.gs(GeneratorType.DELAY_MODULATION_LFO)));
+        return SoundFontMath.timecentsToSeconds(@as(f32, @floatFromInt(self.gs(GeneratorType.DELAY_MODULATION_LFO))));
     }
 
     fn getFrequencyModulationLfo(self: *const Self) f32 {
-        return SoundFontMath.centsToHertz(@intToFloat(f32, self.gs(GeneratorType.FREQUENCY_MODULATION_LFO)));
+        return SoundFontMath.centsToHertz(@as(f32, @floatFromInt(self.gs(GeneratorType.FREQUENCY_MODULATION_LFO))));
     }
 
     fn getDelayVibratoLfo(self: *const Self) f32 {
-        return SoundFontMath.timecentsToSeconds(@intToFloat(f32, self.gs(GeneratorType.DELAY_VIBRATO_LFO)));
+        return SoundFontMath.timecentsToSeconds(@as(f32, @floatFromInt(self.gs(GeneratorType.DELAY_VIBRATO_LFO))));
     }
 
     fn getFrequencyVibratoLfo(self: *const Self) f32 {
-        return SoundFontMath.centsToHertz(@intToFloat(f32, self.gs(GeneratorType.FREQUENCY_VIBRATO_LFO)));
+        return SoundFontMath.centsToHertz(@as(f32, @floatFromInt(self.gs(GeneratorType.FREQUENCY_VIBRATO_LFO))));
     }
 
     fn getDelayModulationEnvelope(self: *const Self) f32 {
-        return SoundFontMath.timecentsToSeconds(@intToFloat(f32, self.gs(GeneratorType.DELAY_MODULATION_ENVELOPE)));
+        return SoundFontMath.timecentsToSeconds(@as(f32, @floatFromInt(self.gs(GeneratorType.DELAY_MODULATION_ENVELOPE))));
     }
 
     fn getAttackModulationEnvelope(self: *const Self) f32 {
-        return SoundFontMath.timecentsToSeconds(@intToFloat(f32, self.gs(GeneratorType.ATTACK_MODULATION_ENVELOPE)));
+        return SoundFontMath.timecentsToSeconds(@as(f32, @floatFromInt(self.gs(GeneratorType.ATTACK_MODULATION_ENVELOPE))));
     }
 
     fn getHoldModulationEnvelope(self: *const Self) f32 {
-        return SoundFontMath.timecentsToSeconds(@intToFloat(f32, self.gs(GeneratorType.HOLD_MODULATION_ENVELOPE)));
+        return SoundFontMath.timecentsToSeconds(@as(f32, @floatFromInt(self.gs(GeneratorType.HOLD_MODULATION_ENVELOPE))));
     }
 
     fn getDecayModulationEnvelope(self: *const Self) f32 {
-        return SoundFontMath.timecentsToSeconds(@intToFloat(f32, self.gs(GeneratorType.DECAY_MODULATION_ENVELOPE)));
+        return SoundFontMath.timecentsToSeconds(@as(f32, @floatFromInt(self.gs(GeneratorType.DECAY_MODULATION_ENVELOPE))));
     }
 
     fn getSustainModulationEnvelope(self: *const Self) f32 {
-        return 0.1 * @intToFloat(f32, self.gs(GeneratorType.SUSTAIN_MODULATION_ENVELOPE));
+        return 0.1 * @as(f32, @floatFromInt(self.gs(GeneratorType.SUSTAIN_MODULATION_ENVELOPE)));
     }
 
     fn getReleaseModulationEnvelope(self: *const Self) f32 {
-        return SoundFontMath.timecentsToSeconds(@intToFloat(f32, self.gs(GeneratorType.RELEASE_MODULATION_ENVELOPE)));
+        return SoundFontMath.timecentsToSeconds(@as(f32, @floatFromInt(self.gs(GeneratorType.RELEASE_MODULATION_ENVELOPE))));
     }
 
     fn getKeyNumberToModulationEnvelopeHold(self: *const Self) i32 {
@@ -2134,27 +2055,27 @@ const RegionPair = struct {
     }
 
     fn getDelayVolumeEnvelope(self: *const Self) f32 {
-        return SoundFontMath.timecentsToSeconds(@intToFloat(f32, self.gs(GeneratorType.DELAY_VOLUME_ENVELOPE)));
+        return SoundFontMath.timecentsToSeconds(@as(f32, @floatFromInt(self.gs(GeneratorType.DELAY_VOLUME_ENVELOPE))));
     }
 
     fn getAttackVolumeEnvelope(self: *const Self) f32 {
-        return SoundFontMath.timecentsToSeconds(@intToFloat(f32, self.gs(GeneratorType.ATTACK_VOLUME_ENVELOPE)));
+        return SoundFontMath.timecentsToSeconds(@as(f32, @floatFromInt(self.gs(GeneratorType.ATTACK_VOLUME_ENVELOPE))));
     }
 
     fn getHoldVolumeEnvelope(self: *const Self) f32 {
-        return SoundFontMath.timecentsToSeconds(@intToFloat(f32, self.gs(GeneratorType.HOLD_VOLUME_ENVELOPE)));
+        return SoundFontMath.timecentsToSeconds(@as(f32, @floatFromInt(self.gs(GeneratorType.HOLD_VOLUME_ENVELOPE))));
     }
 
     fn getDecayVolumeEnvelope(self: *const Self) f32 {
-        return SoundFontMath.timecentsToSeconds(@intToFloat(f32, self.gs(GeneratorType.DECAY_VOLUME_ENVELOPE)));
+        return SoundFontMath.timecentsToSeconds(@as(f32, @floatFromInt(self.gs(GeneratorType.DECAY_VOLUME_ENVELOPE))));
     }
 
     fn getSustainVolumeEnvelope(self: *const Self) f32 {
-        return 0.1 * @intToFloat(f32, self.gs(GeneratorType.SUSTAIN_VOLUME_ENVELOPE));
+        return 0.1 * @as(f32, @floatFromInt(self.gs(GeneratorType.SUSTAIN_VOLUME_ENVELOPE)));
     }
 
     fn getReleaseVolumeEnvelope(self: *const Self) f32 {
-        return SoundFontMath.timecentsToSeconds(@intToFloat(f32, self.gs(GeneratorType.RELEASE_VOLUME_ENVELOPE)));
+        return SoundFontMath.timecentsToSeconds(@as(f32, @floatFromInt(self.gs(GeneratorType.RELEASE_VOLUME_ENVELOPE))));
     }
 
     fn getKeyNumberToVolumeEnvelopeHold(self: *const Self) i32 {
@@ -2166,7 +2087,7 @@ const RegionPair = struct {
     }
 
     fn getInitialAttenuation(self: *const Self) f32 {
-        return 0.1 * @intToFloat(f32, self.gs(GeneratorType.INITIAL_ATTENUATION));
+        return 0.1 * @as(f32, @floatFromInt(self.gs(GeneratorType.INITIAL_ATTENUATION)));
     }
 
     fn getCoarseTune(self: *const Self) i32 {
@@ -2225,7 +2146,7 @@ const RegionEx = struct {
     fn startModulationEnvelope(envelope: *ModulationEnvelope, region: *RegionPair, key: i32, velocity: i32) void {
         // According to the implementation of TinySoundFont, the attack time should be adjusted by the velocity.
         const delay = region.getDelayModulationEnvelope();
-        const attack = region.getAttackModulationEnvelope() * (@intToFloat(f32, 145 - velocity) / 144.0);
+        const attack = region.getAttackModulationEnvelope() * (@as(f32, @floatFromInt(145 - velocity)) / 144.0);
         const hold = region.getHoldModulationEnvelope() * SoundFontMath.keyNumberToMultiplyingFactor(region.getKeyNumberToModulationEnvelopeHold(), key);
         const decay = region.getDecayModulationEnvelope() * SoundFontMath.keyNumberToMultiplyingFactor(region.getKeyNumberToModulationEnvelopeDecay(), key);
         const sustain = 1.0 - region.getSustainModulationEnvelope() / 100.0;
@@ -2251,7 +2172,7 @@ const Voice = struct {
     const RELEASED: i32 = 2;
 
     sample_rate: i32,
-    block_size: i32,
+    block_size: usize,
 
     vol_env: VolumeEnvelope,
     mod_env: ModulationEnvelope,
@@ -2309,8 +2230,8 @@ const Voice = struct {
     smoothed_cutoff: f32,
 
     voice_state: i32,
-    voice_length: i32,
-    minimum_voice_length: i32,
+    voice_length: usize,
+    minimum_voice_length: usize,
 
     fn init(settings: *const SynthesizerSettings, block: []f32) Self {
         return Self{
@@ -2352,7 +2273,7 @@ const Voice = struct {
             .smoothed_cutoff = 0.0,
             .voice_state = 0,
             .voice_length = 0,
-            .minimum_voice_length = @divTrunc(settings.sample_rate, 500),
+            .minimum_voice_length = @intCast(@divTrunc(settings.sample_rate, 500)),
         };
     }
 
@@ -2367,7 +2288,7 @@ const Voice = struct {
             // I'm not sure why, but this indeed improves the loudness variability.
             const sample_attenuation = 0.4 * region.getInitialAttenuation();
             const filter_attenuation = 0.5 * region.getInitialFilterQ();
-            const decibels = 2.0 * SoundFontMath.linearToDecibels(@intToFloat(f32, velocity) / 127.0) - sample_attenuation - filter_attenuation;
+            const decibels = 2.0 * SoundFontMath.linearToDecibels(@as(f32, @floatFromInt(velocity)) / 127.0) - sample_attenuation - filter_attenuation;
             self.note_gain = SoundFontMath.decibelsToLinear(decibels);
         } else {
             self.note_gain = 0.0;
@@ -2376,9 +2297,9 @@ const Voice = struct {
         self.cutoff = region.getInitialFilterCutoffFrequency();
         self.resonance = SoundFontMath.decibelsToLinear(region.getInitialFilterQ());
 
-        self.vib_lfo_to_pitch = 0.01 * @intToFloat(f32, region.getVibratoLfoToPitch());
-        self.mod_lfo_to_pitch = 0.01 * @intToFloat(f32, region.getModulationLfoToPitch());
-        self.mod_env_to_pitch = 0.01 * @intToFloat(f32, region.getModulationEnvelopeToPitch());
+        self.vib_lfo_to_pitch = 0.01 * @as(f32, @floatFromInt(region.getVibratoLfoToPitch()));
+        self.mod_lfo_to_pitch = 0.01 * @as(f32, @floatFromInt(region.getModulationLfoToPitch()));
+        self.mod_env_to_pitch = 0.01 * @as(f32, @floatFromInt(region.getModulationEnvelopeToPitch()));
 
         self.mod_lfo_to_cutoff = region.getModulationLfoToFilterCutoffFrequency();
         self.mod_env_to_cutoff = region.getModulationEnvelopeToFilterCutoffFrequency();
@@ -2420,7 +2341,7 @@ const Voice = struct {
             return false;
         }
 
-        const channel_info = &synthesizer.channels[@intCast(usize, self.channel)];
+        const channel_info = &synthesizer.channels[@intCast(self.channel)];
 
         self.releaseIfNecessary(channel_info);
 
@@ -2435,13 +2356,13 @@ const Voice = struct {
         const vib_pitch_change = (0.01 * channel_info.getModulation() + self.vib_lfo_to_pitch) * self.vib_lfo.getValue();
         const mod_pitch_change = self.mod_lfo_to_pitch * self.mod_lfo.getValue() + self.mod_env_to_pitch * self.mod_env.getValue();
         const channel_pitch_change = channel_info.getTune() + channel_info.getPitchBend();
-        const pitch = @intToFloat(f32, self.key) + vib_pitch_change + mod_pitch_change + channel_pitch_change;
+        const pitch = @as(f32, @floatFromInt(self.key)) + vib_pitch_change + mod_pitch_change + channel_pitch_change;
         if (!self.oscillator.processUnit(self.block, pitch)) {
             return false;
         }
 
         if (self.dynamic_cutoff) {
-            const cents = @intToFloat(f32, self.mod_lfo_to_cutoff) * self.mod_lfo.getValue() + @intToFloat(f32, self.mod_env_to_cutoff) * self.mod_env.getValue();
+            const cents = @as(f32, @floatFromInt(self.mod_lfo_to_cutoff)) * self.mod_lfo.getValue() + @as(f32, @floatFromInt(self.mod_env_to_cutoff)) * self.mod_env.getValue();
             const factor = SoundFontMath.centsToMultiplyingFactor(cents);
             const new_cutoff = factor * self.cutoff;
 
@@ -2526,20 +2447,18 @@ const VoiceCollection = struct {
 
     block_buffer: []f32,
     voices: []Voice,
-    active_voice_count: i32,
+    active_voice_count: usize,
 
     fn init(allocator: Allocator, settings: *const SynthesizerSettings) !Self {
-        var block_buffer = try allocator.alloc(f32, @intCast(usize, settings.block_size * settings.maximum_polyphony));
+        var block_buffer = try allocator.alloc(f32, @intCast(settings.block_size * settings.maximum_polyphony));
         errdefer allocator.free(block_buffer);
 
-        var voices = try allocator.alloc(Voice, @intCast(usize, settings.maximum_polyphony));
+        var voices = try allocator.alloc(Voice, settings.maximum_polyphony);
         errdefer allocator.free(voices);
-
-        var i: usize = 0;
-        while (i < voices.len) : (i += 1) {
-            const buffer_start = @intCast(usize, settings.block_size) * i;
-            const buffer_end = buffer_start + @intCast(usize, settings.block_size);
-            var block = block_buffer[buffer_start..buffer_end];
+        for (0..voices.len) |i| {
+            const buffer_start = settings.block_size * i;
+            const buffer_end = buffer_start + settings.block_size;
+            const block = block_buffer[buffer_start..buffer_end];
             voices[i] = Voice.init(settings, block);
         }
 
@@ -2559,11 +2478,11 @@ const VoiceCollection = struct {
     fn requestNew(self: *Self, region: *InstrumentRegion, channel: i32) ?*Voice {
         // If an exclusive class is assigned to the region, find a voice with the same class.
         // If found, reuse it to avoid playing multiple voices with the same class at a time.
-        var exclusive_class = region.getExclusiveClass();
+        const exclusive_class = region.getExclusiveClass();
         if (exclusive_class != 0) {
             var i: usize = 0;
             while (i < self.active_voice_count) : (i += 1) {
-                var voice = &self.voices[i];
+                const voice = &self.voices[i];
                 if (voice.exclusive_class == exclusive_class and voice.channel == channel) {
                     return voice;
                 }
@@ -2572,7 +2491,7 @@ const VoiceCollection = struct {
 
         // If the number of active voices is less than the limit, use a free one.
         if (self.active_voice_count < self.voices.len) {
-            var free = &self.voices[@intCast(usize, self.active_voice_count)];
+            const free = &self.voices[self.active_voice_count];
             self.active_voice_count += 1;
             return free;
         }
@@ -2581,10 +2500,8 @@ const VoiceCollection = struct {
         // Find one which has the lowest priority.
         var candidate: ?*Voice = null;
         var lowest_priority: f32 = 1000000.0;
-        var i: usize = 0;
-        while (i < self.active_voice_count) : (i += 1) {
-            var voice = &self.voices[i];
-            var priority = voice.getPriority();
+        for (self.getActiveVoices()) |*voice| {
+            const priority = voice.getPriority();
             if (priority < lowest_priority) {
                 lowest_priority = priority;
                 candidate = voice;
@@ -2601,7 +2518,6 @@ const VoiceCollection = struct {
 
     fn processUnit(self: *Self, synthesizer: *Synthesizer) void {
         var i: usize = 0;
-
         while (true) {
             if (i == self.active_voice_count) {
                 return;
@@ -2612,11 +2528,15 @@ const VoiceCollection = struct {
             } else {
                 self.active_voice_count -= 1;
 
-                var tmp = self.voices[i];
-                self.voices[i] = self.voices[@intCast(usize, self.active_voice_count)];
-                self.voices[@intCast(usize, self.active_voice_count)] = tmp;
+                const tmp = self.voices[i];
+                self.voices[i] = self.voices[self.active_voice_count];
+                self.voices[self.active_voice_count] = tmp;
             }
         }
+    }
+
+    fn getActiveVoices(self: *Self) []Voice {
+        return self.voices[0..self.active_voice_count];
     }
 
     fn clear(self: *Self) void {
@@ -2634,7 +2554,7 @@ const Oscillator = struct {
 
     const FRAC_BITS = 24;
     const FRAC_UNIT: i64 = 1 << Oscillator.FRAC_BITS;
-    const FP_TO_SAMPLE: f32 = 1.0 / (32768.0 * @intToFloat(f32, Oscillator.FRAC_UNIT));
+    const FP_TO_SAMPLE: f32 = 1.0 / (32768.0 * @as(f32, @floatFromInt(Oscillator.FRAC_UNIT)));
 
     synthesizer_sample_rate: i32,
 
@@ -2684,9 +2604,9 @@ const Oscillator = struct {
         self.end_loop = end_loop;
         self.root_key = root_key;
 
-        self.tune = @intToFloat(f32, coarse_tune) + 0.01 * @intToFloat(f32, fine_tune);
-        self.pitch_change_scale = 0.01 * @intToFloat(f32, scale_tuning);
-        self.sample_rate_ratio = @intToFloat(f32, sample_rate) / @intToFloat(f32, self.synthesizer_sample_rate);
+        self.tune = @as(f32, @floatFromInt(coarse_tune)) + 0.01 * @as(f32, @floatFromInt(fine_tune));
+        self.pitch_change_scale = 0.01 * @as(f32, @floatFromInt(scale_tuning));
+        self.sample_rate_ratio = @as(f32, @floatFromInt(sample_rate)) / @as(f32, @floatFromInt(self.synthesizer_sample_rate));
 
         if (self.loop_mode == LoopMode.NO_LOOP) {
             self.looping = false;
@@ -2694,7 +2614,7 @@ const Oscillator = struct {
             self.looping = true;
         }
 
-        self.position_fp = @intCast(i64, start) << Oscillator.FRAC_BITS;
+        self.position_fp = @as(i64, @intCast(start)) << Oscillator.FRAC_BITS;
     }
 
     fn releaseUnit(self: *Self) void {
@@ -2704,13 +2624,13 @@ const Oscillator = struct {
     }
 
     fn processUnit(self: *Self, block: []f32, pitch: f32) bool {
-        const pitch_change = self.pitch_change_scale * (pitch - @intToFloat(f32, self.root_key)) + self.tune;
+        const pitch_change = self.pitch_change_scale * (pitch - @as(f32, @floatFromInt(self.root_key))) + self.tune;
         const pitch_ratio = self.sample_rate_ratio * math.pow(f32, 2.0, pitch_change / 12.0);
         return self.fillBlock(block, pitch_ratio);
     }
 
     fn fillBlock(self: *Self, block: []f32, pitch_ratio: f64) bool {
-        const pitch_ratio_fp = @floatToInt(i64, @intToFloat(f64, Oscillator.FRAC_UNIT) * pitch_ratio);
+        const pitch_ratio_fp = @as(i64, @intFromFloat(@as(f64, @floatFromInt(Oscillator.FRAC_UNIT)) * pitch_ratio));
 
         if (self.looping) {
             return self.fillBlock_continuous(block, pitch_ratio_fp);
@@ -2720,18 +2640,15 @@ const Oscillator = struct {
     }
 
     fn fillBlock_noLoop(self: *Self, block: []f32, pitch_ratio_fp: i64) bool {
-        const data_r = self.data.?;
-        const block_length = block.len;
+        const data = self.data.?;
 
-        var t: usize = 0;
-        while (t < block_length) : (t += 1) {
-            const index = @intCast(usize, self.position_fp >> Oscillator.FRAC_BITS);
+        for (block, 0..block.len) |*dst, t| {
+            const index: usize = @bitCast(@as(usize, @intCast(self.position_fp)) >> Oscillator.FRAC_BITS);
 
             if (index >= self.end) {
                 if (t > 0) {
-                    var u = t;
-                    while (u < block_length) : (u += 1) {
-                        block[u] = 0.0;
+                    for (block[t..block.len]) |*dst2| {
+                        dst2.* = 0.0;
                     }
                     return true;
                 } else {
@@ -2739,10 +2656,10 @@ const Oscillator = struct {
                 }
             }
 
-            const x1 = @intCast(i64, data_r[index]);
-            const x2 = @intCast(i64, data_r[index + 1]);
+            const x1: i64 = @intCast(data[index]);
+            const x2: i64 = @intCast(data[index + 1]);
             const a_fp = self.position_fp & (Oscillator.FRAC_UNIT - 1);
-            block[t] = Oscillator.FP_TO_SAMPLE * @intToFloat(f32, (x1 << Oscillator.FRAC_BITS) + a_fp * (x2 - x1));
+            dst.* = Oscillator.FP_TO_SAMPLE * @as(f32, @floatFromInt((x1 << Oscillator.FRAC_BITS) + a_fp * (x2 - x1)));
 
             self.position_fp += pitch_ratio_fp;
         }
@@ -2751,31 +2668,26 @@ const Oscillator = struct {
     }
 
     fn fillBlock_continuous(self: *Self, block: []f32, pitch_ratio_fp: i64) bool {
-        const data_r = self.data.?;
-        const block_length = block.len;
+        const data = self.data.?;
+        const end_loop_fp = @as(i64, @intCast(self.end_loop)) << Oscillator.FRAC_BITS;
+        const loop_length = @as(usize, @intCast(self.end_loop - self.start_loop));
+        const loop_length_fp = @as(i64, @intCast(loop_length)) << Oscillator.FRAC_BITS;
 
-        const end_loop_fp = @intCast(i64, self.end_loop) << Oscillator.FRAC_BITS;
-
-        const loop_length = @intCast(usize, self.end_loop - self.start_loop);
-        const loop_length_fp = @intCast(i64, loop_length) << Oscillator.FRAC_BITS;
-
-        var t: usize = 0;
-        while (t < block_length) : (t += 1) {
+        for (block) |*dst| {
             if (self.position_fp >= end_loop_fp) {
                 self.position_fp -= loop_length_fp;
             }
 
-            const index1 = @intCast(usize, self.position_fp >> Oscillator.FRAC_BITS);
+            const index1: usize = @bitCast(@as(usize, @intCast(self.position_fp)) >> Oscillator.FRAC_BITS);
             var index2 = index1 + 1;
-
             if (index2 >= self.end_loop) {
                 index2 -= loop_length;
             }
 
-            const x1 = @intCast(i64, data_r[index1]);
-            const x2 = @intCast(i64, data_r[index2]);
+            const x1: i64 = @intCast(data[index1]);
+            const x2: i64 = @intCast(data[index2]);
             const a_fp = self.position_fp & (Oscillator.FRAC_UNIT - 1);
-            block[t] = Oscillator.FP_TO_SAMPLE * @intToFloat(f32, (x1 << Oscillator.FRAC_BITS) + a_fp * (x2 - x1));
+            dst.* = Oscillator.FP_TO_SAMPLE * @as(f32, @floatFromInt((x1 << Oscillator.FRAC_BITS) + a_fp * (x2 - x1)));
 
             self.position_fp += pitch_ratio_fp;
         }
@@ -2828,14 +2740,14 @@ const BiQuadFilter = struct {
     }
 
     fn setLowPassFilter(self: *Self, cutoff_frequency: f32, resonance: f32) void {
-        if (cutoff_frequency < 0.499 * @intToFloat(f32, self.sample_rate)) {
+        if (cutoff_frequency < 0.499 * @as(f32, @floatFromInt(self.sample_rate))) {
             self.active = true;
 
             // This equation gives the Q value which makes the desired resonance peak.
             // The error of the resultant peak height is less than 3%.
             const q = resonance - BiQuadFilter.RESONANCE_PEAK_OFFSET / (1.0 + 6.0 * (resonance - 1.0));
 
-            const w = 2.0 * math.pi * cutoff_frequency / @intToFloat(f32, self.sample_rate);
+            const w = 2.0 * math.pi * cutoff_frequency / @as(f32, @floatFromInt(self.sample_rate));
             const cosw = @cos(w);
             const alpha = @sin(w) / (2.0 * q);
 
@@ -2853,11 +2765,8 @@ const BiQuadFilter = struct {
     }
 
     fn processUnit(self: *Self, block: []f32) void {
-        const block_length = block.len;
-
         if (self.active) {
-            var t: usize = 0;
-            while (t < block_length) : (t += 1) {
+            for (0..block.len) |t| {
                 const input = block[t];
                 const output = self.a0 * input + self.a1 * self.x1 + self.a2 * self.x2 - self.a3 * self.y1 - self.a4 * self.y2;
 
@@ -2869,8 +2778,8 @@ const BiQuadFilter = struct {
                 block[t] = output;
             }
         } else {
-            self.x2 = block[block_length - 2];
-            self.x1 = block[block_length - 1];
+            self.x2 = block[block.len - 2];
+            self.x1 = block[block.len - 1];
             self.y2 = self.x2;
             self.y1 = self.x1;
         }
@@ -2902,7 +2811,7 @@ const VolumeEnvelope = struct {
     sustain_level: f32,
     release_level: f32,
 
-    processed_sample_count: i32,
+    processed_sample_count: usize,
     stage: i32,
     value: f32,
 
@@ -2949,14 +2858,14 @@ const VolumeEnvelope = struct {
 
     fn releaseUnit(self: *Self) void {
         self.stage = EnvelopeStage.RELEASE;
-        self.release_start_time = @intToFloat(f64, self.processed_sample_count) / @intToFloat(f64, self.sample_rate);
+        self.release_start_time = @as(f64, @floatFromInt(self.processed_sample_count)) / @as(f64, @floatFromInt(self.sample_rate));
         self.release_level = self.value;
     }
 
-    fn processUnit(self: *Self, sample_count: i32) bool {
+    fn processUnit(self: *Self, sample_count: usize) bool {
         self.processed_sample_count += sample_count;
 
-        const current_time = @intToFloat(f64, self.processed_sample_count) / @intToFloat(f64, self.sample_rate);
+        const current_time = @as(f64, @floatFromInt(self.processed_sample_count)) / @as(f64, @floatFromInt(self.sample_rate));
 
         while (self.stage <= EnvelopeStage.HOLD) {
             const end_time = switch (self.stage) {
@@ -2978,7 +2887,7 @@ const VolumeEnvelope = struct {
             self.priority = 4.0 + self.value;
             return true;
         } else if (self.stage == EnvelopeStage.ATTACK) {
-            self.value = @floatCast(f32, self.attack_slope * (current_time - self.attack_start_time));
+            self.value = @floatCast(self.attack_slope * (current_time - self.attack_start_time));
             self.priority = 3.0 + self.value;
             return true;
         } else if (self.stage == EnvelopeStage.HOLD) {
@@ -2986,11 +2895,11 @@ const VolumeEnvelope = struct {
             self.priority = 2.0 + self.value;
             return true;
         } else if (self.stage == EnvelopeStage.DECAY) {
-            self.value = @max(@floatCast(f32, SoundFontMath.expCutoff(self.decay_slope * (current_time - self.decay_start_time))), self.sustain_level);
+            self.value = @max(@as(f32, @floatCast(SoundFontMath.expCutoff(self.decay_slope * (current_time - self.decay_start_time)))), self.sustain_level);
             self.priority = 1.0 + self.value;
             return self.value > SoundFontMath.NON_AUDIBLE;
         } else if (self.stage == EnvelopeStage.RELEASE) {
-            self.value = self.release_level * @floatCast(f32, SoundFontMath.expCutoff(self.release_slope * (current_time - self.release_start_time)));
+            self.value = self.release_level * @as(f32, @floatCast(SoundFontMath.expCutoff(self.release_slope * (current_time - self.release_start_time))));
             self.priority = self.value;
             return self.value > SoundFontMath.NON_AUDIBLE;
         } else {
@@ -3026,7 +2935,7 @@ const ModulationEnvelope = struct {
     sustain_level: f32,
     release_level: f32,
 
-    processed_sample_count: i32,
+    processed_sample_count: usize,
     stage: i32,
     value: f32,
 
@@ -3073,14 +2982,14 @@ const ModulationEnvelope = struct {
 
     fn releaseUnit(self: *Self) void {
         self.stage = EnvelopeStage.RELEASE;
-        self.release_end_time += @intToFloat(f64, self.processed_sample_count) / @intToFloat(f64, self.sample_rate);
+        self.release_end_time += @as(f64, @floatFromInt(self.processed_sample_count)) / @as(f64, @floatFromInt(self.sample_rate));
         self.release_level = self.value;
     }
 
-    fn processUnit(self: *Self, sample_count: i32) bool {
+    fn processUnit(self: *Self, sample_count: usize) bool {
         self.processed_sample_count += sample_count;
 
-        const current_time = @intToFloat(f64, self.processed_sample_count) / @intToFloat(f64, self.sample_rate);
+        const current_time = @as(f64, @floatFromInt(self.processed_sample_count)) / @as(f64, @floatFromInt(self.sample_rate));
 
         while (self.stage <= EnvelopeStage.HOLD) {
             const end_time = switch (self.stage) {
@@ -3101,16 +3010,16 @@ const ModulationEnvelope = struct {
             self.value = 0.0;
             return true;
         } else if (self.stage == EnvelopeStage.ATTACK) {
-            self.value = @floatCast(f32, self.attack_slope * (current_time - self.attack_start_time));
+            self.value = @floatCast(self.attack_slope * (current_time - self.attack_start_time));
             return true;
         } else if (self.stage == EnvelopeStage.HOLD) {
             self.value = 1.0;
             return true;
         } else if (self.stage == EnvelopeStage.DECAY) {
-            self.value = @max(@floatCast(f32, self.decay_slope * (self.decay_end_time - current_time)), self.sustain_level);
+            self.value = @max(@as(f32, @floatCast(self.decay_slope * (self.decay_end_time - current_time))), self.sustain_level);
             return self.value > SoundFontMath.NON_AUDIBLE;
         } else if (self.stage == EnvelopeStage.RELEASE) {
-            self.value = @max(@floatCast(f32, self.release_level * self.release_slope * (self.release_end_time - current_time)), 0.0);
+            self.value = @max(@as(f32, @floatCast(self.release_level * self.release_slope * (self.release_end_time - current_time))), 0.0);
             return self.value > SoundFontMath.NON_AUDIBLE;
         } else {
             unreachable;
@@ -3134,14 +3043,14 @@ const Lfo = struct {
     const Self = @This();
 
     sample_rate: i32,
-    block_size: i32,
+    block_size: usize,
 
     active: bool,
 
     delay: f64,
     period: f64,
 
-    processed_sample_count: i32,
+    processed_sample_count: usize,
     value: f32,
 
     fn init(settings: *const SynthesizerSettings) Self {
@@ -3178,18 +3087,18 @@ const Lfo = struct {
 
         self.processed_sample_count += self.block_size;
 
-        const current_time = @intToFloat(f64, self.processed_sample_count) / @intToFloat(f64, self.sample_rate);
+        const current_time = @as(f64, @floatFromInt(self.processed_sample_count)) / @as(f64, @floatFromInt(self.sample_rate));
 
         if (current_time < self.delay) {
             self.value = 0.0;
         } else {
             const phase = @mod((current_time - self.delay), self.period) / self.period;
             if (phase < 0.25) {
-                self.value = @floatCast(f32, 4.0 * phase);
+                self.value = @floatCast(4.0 * phase);
             } else if (phase < 0.75) {
-                self.value = @floatCast(f32, 4.0 * (0.5 - phase));
+                self.value = @floatCast(4.0 * (0.5 - phase));
             } else {
-                self.value = @floatCast(f32, 4.0 * (phase - 1.0));
+                self.value = @floatCast(4.0 * (phase - 1.0));
             }
         }
     }
@@ -3291,35 +3200,35 @@ const Channel = struct {
     }
 
     fn setModulationCoarse(self: *Self, value: i32) void {
-        self.modulation = @truncate(i16, (@intCast(i32, self.modulation) & 0x7F) | (value << 7));
+        self.modulation = @as(i16, @truncate((@as(i32, @intCast(self.modulation)) & 0x7F) | (value << 7)));
     }
 
     fn setModulationFine(self: *Self, value: i32) void {
-        self.modulation = @truncate(i16, (@intCast(i32, self.modulation) & 0xFF80) | value);
+        self.modulation = @as(i16, @truncate((@as(i32, @intCast(self.modulation)) & 0xFF80) | value));
     }
 
     fn setVolumeCoarse(self: *Self, value: i32) void {
-        self.volume = @truncate(i16, (@intCast(i32, self.volume) & 0x7F) | (value << 7));
+        self.volume = @as(i16, @truncate((@as(i32, @intCast(self.volume)) & 0x7F) | (value << 7)));
     }
 
     fn setVolumeFine(self: *Self, value: i32) void {
-        self.volume = @truncate(i16, (@intCast(i32, self.volume) & 0xFF80) | value);
+        self.volume = @as(i16, @truncate((@as(i32, @intCast(self.volume)) & 0xFF80) | value));
     }
 
     fn setPanCoarse(self: *Self, value: i32) void {
-        self.pan = @truncate(i16, (@intCast(i32, self.pan) & 0x7F) | (value << 7));
+        self.pan = @as(i16, @truncate((@as(i32, @intCast(self.pan)) & 0x7F) | (value << 7)));
     }
 
     fn setPanFine(self: *Self, value: i32) void {
-        self.pan = @truncate(i16, (@intCast(i32, self.pan) & 0xFF80) | value);
+        self.pan = @as(i16, @truncate((@as(i32, @intCast(self.pan)) & 0xFF80) | value));
     }
 
     fn setExpressionCoarse(self: *Self, value: i32) void {
-        self.expression = @truncate(i16, (@intCast(i32, self.expression) & 0x7F) | (value << 7));
+        self.expression = @as(i16, @truncate((@as(i32, @intCast(self.expression)) & 0x7F) | (value << 7)));
     }
 
     fn setExpressionFine(self: *Self, value: i32) void {
-        self.expression = @truncate(i16, (@intCast(i32, self.expression) & 0xFF80) | value);
+        self.expression = @as(i16, @truncate((@as(i32, @intCast(self.expression)) & 0xFF80) | value));
     }
 
     fn setHoldPedal(self: *Self, value: i32) void {
@@ -3327,41 +3236,41 @@ const Channel = struct {
     }
 
     fn setReverbSend(self: *Self, value: i32) void {
-        self.reverb_send = @truncate(u8, @bitCast(u32, value));
+        self.reverb_send = @as(u8, @truncate(@as(u32, @bitCast(value))));
     }
 
     fn setChorusSend(self: *Self, value: i32) void {
-        self.chorus_send = @truncate(u8, @bitCast(u32, value));
+        self.chorus_send = @as(u8, @truncate(@as(u32, @bitCast(value))));
     }
 
     fn setRpnCoarse(self: *Self, value: i32) void {
-        self.rpn = @truncate(i16, (@intCast(i32, self.rpn) & 0x7F) | (value << 7));
+        self.rpn = @as(i16, @truncate((@as(i32, @intCast(self.rpn)) & 0x7F) | (value << 7)));
     }
 
     fn setRpnFine(self: *Self, value: i32) void {
-        self.rpn = @truncate(i16, (@intCast(i32, self.rpn) & 0xFF80) | value);
+        self.rpn = @as(i16, @truncate((@as(i32, @intCast(self.rpn)) & 0xFF80) | value));
     }
 
     fn dataEntryCoarse(self: *Self, value: i32) void {
         if (self.rpn == 0) {
-            self.pitch_bend_range = @truncate(i16, (@intCast(i32, self.pitch_bend_range) & 0x7F) | (value << 7));
+            self.pitch_bend_range = @truncate((@as(i32, @intCast(self.pitch_bend_range)) & 0x7F) | (value << 7));
         } else if (self.rpn == 1) {
-            self.fine_tune = @truncate(i16, (@intCast(i32, self.fine_tune) & 0x7F) | (value << 7));
+            self.fine_tune = @truncate((@as(i32, @intCast(self.fine_tune)) & 0x7F) | (value << 7));
         } else if (self.rpn == 2) {
-            self.coarse_tune = @truncate(i16, value - 64);
+            self.coarse_tune = @truncate(value - 64);
         }
     }
 
     fn dataEntryFine(self: *Self, value: i32) void {
         if (self.rpn == 0) {
-            self.pitch_bend_range = @truncate(i16, (@intCast(i32, self.pitch_bend_range) & 0xFF80) | value);
+            self.pitch_bend_range = @truncate((@as(i32, @intCast(self.pitch_bend_range)) & 0xFF80) | value);
         } else if (self.rpn == 1) {
-            self.fine_tune = @truncate(i16, (@intCast(i32, self.fine_tune) & 0xFF80) | value);
+            self.fine_tune = @truncate((@as(i32, @intCast(self.fine_tune)) & 0xFF80) | value);
         }
     }
 
     fn setPitchBend(self: *Self, value1: i32, value2: i32) void {
-        self.pitch_bend = (1.0 / 8192.0) * (@intToFloat(f32, value1 | (value2 << 7)) - 8192.0);
+        self.pitch_bend = (1.0 / 8192.0) * (@as(f32, @floatFromInt(value1 | (value2 << 7))) - 8192.0);
     }
 
     fn getBankNumber(self: *const Self) i32 {
@@ -3373,19 +3282,19 @@ const Channel = struct {
     }
 
     fn getModulation(self: *const Self) f32 {
-        return (50.0 / 16383.0) * @intToFloat(f32, self.modulation);
+        return (50.0 / 16383.0) * @as(f32, @floatFromInt(self.modulation));
     }
 
     fn getVolume(self: *const Self) f32 {
-        return (1.0 / 16383.0) * @intToFloat(f32, self.volume);
+        return (1.0 / 16383.0) * @as(f32, @floatFromInt(self.volume));
     }
 
     fn getPan(self: *const Self) f32 {
-        return (100.0 / 16383.0) * @intToFloat(f32, self.pan) - 50.0;
+        return (100.0 / 16383.0) * @as(f32, @floatFromInt(self.pan)) - 50.0;
     }
 
     fn getExpression(self: *const Self) f32 {
-        return (1.0 / 16383.0) * @intToFloat(f32, self.expression);
+        return (1.0 / 16383.0) * @as(f32, @floatFromInt(self.expression));
     }
 
     fn getHoldPedal(self: *const Self) bool {
@@ -3393,19 +3302,19 @@ const Channel = struct {
     }
 
     fn getReverbSend(self: *const Self) f32 {
-        return (1.0 / 127.0) * @intToFloat(f32, self.reverb_send);
+        return (1.0 / 127.0) * @as(f32, @floatFromInt(self.reverb_send));
     }
 
     fn getChorusSend(self: *const Self) f32 {
-        return (1.0 / 127.0) * @intToFloat(f32, self.chorus_send);
+        return (1.0 / 127.0) * @as(f32, @floatFromInt(self.chorus_send));
     }
 
     fn getPitchBendRange(self: *const Self) f32 {
-        return @intToFloat(f32, self.pitch_bend_range >> 7) + 0.01 * @intToFloat(f32, self.pitch_bend_range & 0x7F);
+        return @as(f32, @floatFromInt(self.pitch_bend_range >> 7)) + 0.01 * @as(f32, @floatFromInt(self.pitch_bend_range & 0x7F));
     }
 
     fn getTune(self: *const Self) f32 {
-        return @intToFloat(f32, self.coarse_tune) + (1.0 / 8192.0) * @intToFloat(f32, self.fine_tune - 8192);
+        return @as(f32, @floatFromInt(self.coarse_tune)) + (1.0 / 8192.0) * @as(f32, @floatFromInt(self.fine_tune - 8192));
     }
 
     fn getPitchBend(self: *const Self) f32 {
@@ -3446,9 +3355,9 @@ const Message = struct {
     fn tempoChange(tempo: i32) Self {
         return Self{
             .channel = Message.TEMPO_CHANGE,
-            .command = @truncate(u8, @bitCast(u32, (tempo >> 16))),
-            .data1 = @truncate(u8, @bitCast(u32, (tempo >> 8))),
-            .data2 = @truncate(u8, @bitCast(u32, tempo)),
+            .command = @as(u8, @truncate(@as(u32, @bitCast((tempo >> 16))))),
+            .data1 = @as(u8, @truncate(@as(u32, @bitCast((tempo >> 8))))),
+            .data2 = @as(u8, @truncate(@as(u32, @bitCast(tempo)))),
         };
     }
 
@@ -3470,7 +3379,7 @@ const Message = struct {
     }
 
     fn getTempo(self: *const Self) f64 {
-        return 60000000.0 / @intToFloat(f64, (@intCast(i32, self.command) << 16) | (@intCast(i32, self.data1) << 8) | @intCast(i32, self.data2));
+        return 60000000.0 / @as(f64, @floatFromInt((@as(i32, @intCast(self.command)) << 16) | (@as(i32, @intCast(self.data1)) << 8) | @as(i32, @intCast(self.data2))));
     }
 };
 
@@ -3499,46 +3408,31 @@ pub const MidiFile = struct {
             return ZiggySynthError.InvalidMidiFile;
         }
 
-        const track_count = @intCast(usize, try BinaryReader.readBigEndian(i16, reader));
-        const resolution = @intCast(i32, try BinaryReader.readBigEndian(i16, reader));
+        const track_count: usize = @intCast(try BinaryReader.readBigEndian(i16, reader));
+        const resolution: i32 = @intCast(try BinaryReader.readBigEndian(i16, reader));
 
         if (track_count > MidiFile.MAX_TRACK_COUNT) {
             return ZiggySynthError.InvalidMidiFile;
         }
 
         var message_lists: [MidiFile.MAX_TRACK_COUNT]ArrayList(Message) = undefined;
-        {
-            var i: usize = 0;
-            while (i < track_count) : (i += 1) {
-                message_lists[i] = ArrayList(Message).init(allocator);
-            }
+        for (0..track_count) |i| {
+            message_lists[i] = ArrayList(Message).init(allocator);
         }
-        defer {
-            var i: usize = 0;
-            while (i < track_count) : (i += 1) {
-                message_lists[i].deinit();
-            }
-        }
+        defer for (0..track_count) |i| {
+            message_lists[i].deinit();
+        };
 
         var tick_lists: [MidiFile.MAX_TRACK_COUNT]ArrayList(i32) = undefined;
-        {
-            var i: usize = 0;
-            while (i < track_count) : (i += 1) {
-                tick_lists[i] = ArrayList(i32).init(allocator);
-            }
+        for (0..track_count) |i| {
+            tick_lists[i] = ArrayList(i32).init(allocator);
         }
-        defer {
-            var i: usize = 0;
-            while (i < track_count) : (i += 1) {
-                tick_lists[i].deinit();
-            }
-        }
+        defer for (0..track_count) |i| {
+            tick_lists[i].deinit();
+        };
 
-        {
-            var i: usize = 0;
-            while (i < track_count) : (i += 1) {
-                try MidiFile.readTrack(reader, &message_lists[i], &tick_lists[i]);
-            }
+        for (0..track_count) |i| {
+            try MidiFile.readTrack(reader, &message_lists[i], &tick_lists[i]);
         }
 
         return try MidiFile.mergeTracks(allocator, message_lists[0..track_count], tick_lists[0..track_count], resolution);
@@ -3555,14 +3449,15 @@ pub const MidiFile = struct {
             return ZiggySynthError.InvalidMidiFile;
         }
 
-        _ = try BinaryReader.readBigEndian(i32, reader);
+        const size = try BinaryReader.readBigEndian(u32, reader);
+        var rc = ReadCounter(@TypeOf(reader)).init(reader);
 
         var tick: i32 = 0;
         var last_status: u8 = 0;
 
         while (true) {
-            const delta = try BinaryReader.readIntVariableLength(reader);
-            const first = try BinaryReader.read(u8, reader);
+            const delta = try BinaryReader.readIntVariableLength(&rc);
+            const first = try BinaryReader.read(u8, &rc);
 
             tick += delta;
 
@@ -3572,7 +3467,7 @@ pub const MidiFile = struct {
                     try messages.append(Message.common1(last_status, first));
                     try ticks.append(tick);
                 } else {
-                    const data2 = try BinaryReader.read(u8, reader);
+                    const data2 = try BinaryReader.read(u8, &rc);
                     try messages.append(Message.common2(last_status, first, data2));
                     try ticks.append(tick);
                 }
@@ -3581,30 +3476,37 @@ pub const MidiFile = struct {
             }
 
             switch (first) {
-                0xF0 => try MidiFile.discardData(reader),
-                0xF7 => try MidiFile.discardData(reader),
-                0xFF => switch (try BinaryReader.read(u8, reader)) {
+                0xF0 => try MidiFile.discardData(&rc),
+                0xF7 => try MidiFile.discardData(&rc),
+                0xFF => switch (try BinaryReader.read(u8, &rc)) {
                     0x2F => {
-                        _ = try BinaryReader.read(u8, reader);
+                        _ = try BinaryReader.read(u8, &rc);
                         try messages.append(Message.endOfTrack());
                         try ticks.append(tick);
+
+                        // Some MIDI files may have events inserted after the EOT.
+                        // Such events should be ignored.
+                        if (rc.count < size) {
+                            try rc.skipBytes(size - rc.count, .{});
+                        }
+
                         return;
                     },
                     0x51 => {
-                        try messages.append(Message.tempoChange(try MidiFile.readTempo(reader)));
+                        try messages.append(Message.tempoChange(try MidiFile.readTempo(&rc)));
                         try ticks.append(tick);
                     },
-                    else => try MidiFile.discardData(reader),
+                    else => try MidiFile.discardData(&rc),
                 },
                 else => {
                     const command = first & 0xF0;
                     if (command == 0xC0 or command == 0xD0) {
-                        const data1 = try BinaryReader.read(u8, reader);
+                        const data1 = try BinaryReader.read(u8, &rc);
                         try messages.append(Message.common1(first, data1));
                         try ticks.append(tick);
                     } else {
-                        const data1 = try BinaryReader.read(u8, reader);
-                        const data2 = try BinaryReader.read(u8, reader);
+                        const data1 = try BinaryReader.read(u8, &rc);
+                        const data2 = try BinaryReader.read(u8, &rc);
                         try messages.append(Message.common2(first, data1, data2));
                         try ticks.append(tick);
                     }
@@ -3633,13 +3535,12 @@ pub const MidiFile = struct {
             var min_tick: i32 = math.maxInt(i32);
             var min_index: i32 = -1;
 
-            var ch: usize = 0;
-            while (ch < tick_lists.len) : (ch += 1) {
+            for (0..tick_lists.len) |ch| {
                 if (indices[ch] < tick_lists[ch].items.len) {
                     const tick = tick_lists[ch].items[indices[ch]];
                     if (tick < min_tick) {
                         min_tick = tick;
-                        min_index = @intCast(i32, ch);
+                        min_index = @intCast(ch);
                     }
                 }
             }
@@ -3648,14 +3549,14 @@ pub const MidiFile = struct {
                 break;
             }
 
-            const next_tick = tick_lists[@intCast(usize, min_index)].items[indices[@intCast(usize, min_index)]];
+            const next_tick = tick_lists[@intCast(min_index)].items[indices[@intCast(min_index)]];
             const delta_tick = next_tick - current_tick;
-            const delta_time = 60.0 / (@intToFloat(f64, resolution) * tempo) * @intToFloat(f64, delta_tick);
+            const delta_time = 60.0 / (@as(f64, @floatFromInt(resolution)) * tempo) * @as(f64, @floatFromInt(delta_tick));
 
             current_tick += delta_tick;
             current_time += delta_time;
 
-            const message = message_lists[@intCast(usize, min_index)].items[indices[@intCast(usize, min_index)]];
+            const message = message_lists[@intCast(min_index)].items[indices[@intCast(min_index)]];
             if (message.getMessageType() == Message.TEMPO_CHANGE) {
                 tempo = message.getTempo();
             } else {
@@ -3663,7 +3564,7 @@ pub const MidiFile = struct {
                 try merged_times.append(current_time);
             }
 
-            indices[@intCast(usize, min_index)] += 1;
+            indices[@intCast(min_index)] += 1;
         }
 
         var messages = try allocator.alloc(Message, merged_messages.items.len);
@@ -3672,8 +3573,7 @@ pub const MidiFile = struct {
         var times = try allocator.alloc(f64, merged_times.items.len);
         errdefer allocator.free(times);
 
-        var i: usize = 0;
-        while (i < messages.len) : (i += 1) {
+        for (0..messages.len) |i| {
             messages[i] = merged_messages.items[i];
             times[i] = merged_times.items[i];
         }
@@ -3686,7 +3586,7 @@ pub const MidiFile = struct {
     }
 
     fn discardData(reader: anytype) !void {
-        const size = @intCast(usize, try BinaryReader.readIntVariableLength(reader));
+        const size: usize = @intCast(try BinaryReader.readIntVariableLength(reader));
         try reader.skipBytes(size, .{});
     }
 
@@ -3696,9 +3596,9 @@ pub const MidiFile = struct {
             return ZiggySynthError.InvalidMidiFile;
         }
 
-        const b1 = @intCast(i32, try BinaryReader.read(u8, reader));
-        const b2 = @intCast(i32, try BinaryReader.read(u8, reader));
-        const b3 = @intCast(i32, try BinaryReader.read(u8, reader));
+        const b1: i32 = @intCast(try BinaryReader.read(u8, reader));
+        const b2: i32 = @intCast(try BinaryReader.read(u8, reader));
+        const b3: i32 = @intCast(try BinaryReader.read(u8, reader));
 
         return ((b1 << 16) | (b2 << 8) | b3);
     }
@@ -3711,11 +3611,9 @@ pub const MidiFile = struct {
 pub const MidiFileSequencer = struct {
     const Self = @This();
 
-    allocator: Allocator,
+    synthesizer: *Synthesizer,
 
-    synthesizer: Synthesizer,
-
-    midi_file: ?MidiFile,
+    midi_file: ?*const MidiFile,
     play_loop: bool,
 
     block_wrote: usize,
@@ -3723,39 +3621,22 @@ pub const MidiFileSequencer = struct {
     current_time: f64,
     msg_index: usize,
 
-    block_left: []f32,
-    block_right: []f32,
-
-    pub fn init(allocator: Allocator, synthesizer: Synthesizer) !Self {
-        const block_left = try allocator.alloc(f32, @intCast(usize, synthesizer.block_size));
-        errdefer allocator.free(block_left);
-
-        const block_right = try allocator.alloc(f32, @intCast(usize, synthesizer.block_size));
-        errdefer allocator.free(block_right);
-
+    pub fn init(synthesizer: *Synthesizer) Self {
         return Self{
-            .allocator = allocator,
             .synthesizer = synthesizer,
             .midi_file = null,
             .play_loop = false,
             .block_wrote = 0,
             .current_time = 0.0,
             .msg_index = 0,
-            .block_left = block_left,
-            .block_right = block_right,
         };
     }
 
-    pub fn deinit(self: *Self) void {
-        self.allocator.free(self.block_right);
-        self.allocator.free(self.block_left);
-    }
-
-    pub fn play(self: *Self, midi_file: MidiFile, play_loop: bool) void {
+    pub fn play(self: *Self, midi_file: *const MidiFile, play_loop: bool) void {
         self.midi_file = midi_file;
         self.play_loop = play_loop;
 
-        self.block_wrote = @intCast(usize, self.synthesizer.block_size);
+        self.block_wrote = self.synthesizer.block_size;
 
         self.current_time = 0.0;
         self.msg_index = 0;
@@ -3775,13 +3656,13 @@ pub const MidiFileSequencer = struct {
 
         var wrote: usize = 0;
         while (wrote < left.len) {
-            if (self.block_wrote == @intCast(usize, self.synthesizer.block_size)) {
+            if (self.block_wrote == self.synthesizer.block_size) {
                 self.processEvents();
                 self.block_wrote = 0;
-                self.current_time += @intToFloat(f64, self.synthesizer.block_size) / @intToFloat(f64, self.synthesizer.sample_rate);
+                self.current_time += @as(f64, @floatFromInt(self.synthesizer.block_size)) / @as(f64, @floatFromInt(self.synthesizer.sample_rate));
             }
 
-            const src_rem = @intCast(usize, self.synthesizer.block_size) - self.block_wrote;
+            const src_rem = @as(usize, @intCast(self.synthesizer.block_size)) - self.block_wrote;
             const dst_rem = left.len - wrote;
             const rem = @min(src_rem, dst_rem);
 
@@ -3801,7 +3682,7 @@ pub const MidiFileSequencer = struct {
 
             if (time <= self.current_time) {
                 if (msg.getMessageType() == Message.NORMAL) {
-                    self.synthesizer.processMidiMessage(@intCast(i32, msg.channel), @intCast(i32, msg.command), @intCast(i32, msg.data1), @intCast(i32, msg.data2));
+                    self.synthesizer.processMidiMessage(@intCast(msg.channel), @intCast(msg.command), @intCast(msg.data1), @intCast(msg.data2));
                 }
                 self.msg_index += 1;
             } else {
@@ -3968,18 +3849,12 @@ const Reverb = struct {
             unreachable;
         }
 
-        {
-            var i: usize = 0;
-            while (i < apfs_l.len) : (i += 1) {
-                apfs_l[i].setFeedback(0.5);
-            }
+        for (&apfs_l) |*apf| {
+            apf.setFeedback(0.5);
         }
 
-        {
-            var i: usize = 0;
-            while (i < apfs_r.len) : (i += 1) {
-                apfs_r[i].setFeedback(0.5);
-            }
+        for (&apfs_r) |*apf| {
+            apf.setFeedback(0.5);
         }
 
         var reverb = Self{
@@ -4014,87 +3889,52 @@ const Reverb = struct {
     }
 
     fn mute(self: *Self) void {
-        {
-            var i: usize = 0;
-            while (i < self.cfs_l.len) : (i += 1) {
-                self.cfs_l[i].mute();
-            }
+        for (&self.cfs_l) |*cf| {
+            cf.mute();
         }
 
-        {
-            var i: usize = 0;
-            while (i < self.cfs_r.len) : (i += 1) {
-                self.cfs_r[i].mute();
-            }
+        for (&self.cfs_r) |*cf| {
+            cf.mute();
         }
 
-        {
-            var i: usize = 0;
-            while (i < self.apfs_l.len) : (i += 1) {
-                self.apfs_l[i].mute();
-            }
+        for (&self.apfs_l) |*apf| {
+            apf.mute();
         }
 
-        {
-            var i: usize = 0;
-            while (i < self.apfs_r.len) : (i += 1) {
-                self.apfs_r[i].mute();
-            }
+        for (&self.apfs_r) |*apf| {
+            apf.mute();
         }
     }
 
     fn scaleTuning(sample_rate: i32, tuning: usize) usize {
-        return @floatToInt(usize, @round(@intToFloat(f64, sample_rate) / 44100.0 * @intToFloat(f64, tuning)));
+        return @intFromFloat(@round(@as(f64, @floatFromInt(sample_rate)) / 44100.0 * @as(f64, @floatFromInt(tuning))));
     }
 
     fn process(self: *Self, input: []f32, output_left: []f32, output_right: []f32) void {
-        const length = input.len;
-
-        {
-            var i: usize = 0;
-            while (i < length) : (i += 1) {
-                output_left[i] = 0.0;
-            }
+        for (output_left) |*dst| {
+            dst.* = 0.0;
         }
-        {
-            var i: usize = 0;
-            while (i < length) : (i += 1) {
-                output_right[i] = 0.0;
-            }
+        for (output_right) |*dst| {
+            dst.* = 0.0;
         }
 
-        {
-            var i: usize = 0;
-            while (i < self.cfs_l.len) : (i += 1) {
-                self.cfs_l[i].process(input, output_left);
-            }
+        for (&self.cfs_l) |*cf| {
+            cf.process(input, output_left);
+        }
+        for (&self.apfs_l) |*apf| {
+            apf.process(output_left);
         }
 
-        {
-            var i: usize = 0;
-            while (i < self.apfs_l.len) : (i += 1) {
-                self.apfs_l[i].process(output_left);
-            }
+        for (&self.cfs_r) |*cf| {
+            cf.process(input, output_right);
         }
-
-        {
-            var i: usize = 0;
-            while (i < self.cfs_r.len) : (i += 1) {
-                self.cfs_r[i].process(input, output_right);
-            }
-        }
-
-        {
-            var i: usize = 0;
-            while (i < self.apfs_r.len) : (i += 1) {
-                self.apfs_r[i].process(output_right);
-            }
+        for (&self.apfs_r) |*apf| {
+            apf.process(output_right);
         }
 
         // With the default settings, we can skip this part.
         if (1.0 - self.wet1 > 1.0E-3 or self.wet2 > 1.0E-3) {
-            var t: usize = 0;
-            while (t < length) : (t += 1) {
+            for (0..input.len) |t| {
                 const left = output_left[t];
                 const right = output_right[t];
                 output_left[t] = left * self.wet1 + right * self.wet2;
@@ -4111,20 +3951,13 @@ const Reverb = struct {
         self.damp1 = self.damp;
         self.gain = Reverb.FIXED_GAIN;
 
-        {
-            var i: usize = 0;
-            while (i < self.cfs_l.len) : (i += 1) {
-                self.cfs_l[i].setFeedback(self.room_size1);
-                self.cfs_l[i].setDamp(self.damp1);
-            }
+        for (&self.cfs_l) |*cf| {
+            cf.setFeedback(self.room_size1);
+            cf.setDamp(self.damp1);
         }
-
-        {
-            var i: usize = 0;
-            while (i < self.cfs_r.len) : (i += 1) {
-                self.cfs_r[i].setFeedback(self.room_size1);
-                self.cfs_r[i].setDamp(self.damp1);
-            }
+        for (&self.cfs_r) |*cf| {
+            cf.setFeedback(self.room_size1);
+            cf.setDamp(self.damp1);
         }
     }
 
@@ -4199,8 +4032,7 @@ const CombFilter = struct {
             const dst_rem = output_block_length - block_index;
             const rem = @min(src_rem, dst_rem);
 
-            var t: usize = 0;
-            while (t < rem) : (t += 1) {
+            for (0..rem) |t| {
                 const block_pos = block_index + t;
                 const buffer_pos = self.buffer_index + t;
 
@@ -4212,12 +4044,12 @@ const CombFilter = struct {
                 // but the simple Math.Abs version was faster according to some benchmarks.
 
                 var output = self.buffer[buffer_pos];
-                if (@fabs(output) < 1.0E-6) {
+                if (@abs(output) < 1.0E-6) {
                     output = 0.0;
                 }
 
                 self.filter_store = (output * self.damp2) + (self.filter_store * self.damp1);
-                if (@fabs(self.filter_store) < 1.0E-6) {
+                if (@abs(self.filter_store) < 1.0E-6) {
                     self.filter_store = 0.0;
                 }
 
@@ -4258,9 +4090,8 @@ const AllPassFilter = struct {
     }
 
     fn mute(self: *Self) void {
-        var i: usize = 0;
-        while (i < self.buffer.len) : (i += 1) {
-            self.buffer[i] = 0.0;
+        for (self.buffer) |*value| {
+            value.* = 0.0;
         }
     }
 
@@ -4278,15 +4109,14 @@ const AllPassFilter = struct {
             const dst_rem = block_length - block_index;
             const rem = @min(src_rem, dst_rem);
 
-            var t: usize = 0;
-            while (t < rem) : (t += 1) {
+            for (0..rem) |t| {
                 const block_pos = block_index + t;
                 const buffer_pos = self.buffer_index + t;
 
                 const input = block[block_pos];
 
                 var bufout = self.buffer[buffer_pos];
-                if (@fabs(bufout) < 1.0E-6) {
+                if (@abs(bufout) < 1.0E-6) {
                     bufout = 0.0;
                 }
 
@@ -4314,32 +4144,27 @@ const Chorus = struct {
 
     delay_table: []f32,
 
-    buffer_index_l: usize,
-    buffer_index_r: usize,
+    buffer_index: usize,
 
     delay_table_index_l: usize,
     delay_table_index_r: usize,
 
     fn init(allocator: Allocator, sample_rate: i32, delay: f64, depth: f64, frequency: f64) !Self {
-        const buffer_length = @floatToInt(usize, @intToFloat(f64, sample_rate) * (delay + depth)) + 2;
-        var buffer_l = try allocator.alloc(f32, buffer_length);
+        const buffer_length = @as(usize, @intFromFloat(@as(f64, @floatFromInt(sample_rate)) * (delay + depth))) + 2;
+        const buffer_l = try allocator.alloc(f32, buffer_length);
         errdefer allocator.free(buffer_l);
-        var buffer_r = try allocator.alloc(f32, buffer_length);
+        const buffer_r = try allocator.alloc(f32, buffer_length);
         errdefer allocator.free(buffer_r);
 
-        const delay_table_length = @floatToInt(usize, @round(@intToFloat(f64, sample_rate) / frequency));
+        const delay_table_length = @as(usize, @intFromFloat(@round(@as(f64, @floatFromInt(sample_rate)) / frequency)));
         var delay_table = try allocator.alloc(f32, delay_table_length);
         errdefer allocator.free(delay_table);
-        {
-            var t: usize = 0;
-            while (t < delay_table_length) : (t += 1) {
-                const phase = 2.0 * math.pi * @intToFloat(f64, t) / @intToFloat(f64, delay_table_length);
-                delay_table[t] = @floatCast(f32, @intToFloat(f64, sample_rate) * (delay + depth * @sin(phase)));
-            }
+        for (0..delay_table_length) |t| {
+            const phase = 2.0 * math.pi * @as(f64, @floatFromInt(t)) / @as(f64, @floatFromInt(delay_table_length));
+            delay_table[t] = @floatCast(@as(f64, @floatFromInt(sample_rate)) * (delay + depth * @sin(phase)));
         }
 
-        const buffer_index_l: usize = 0;
-        const buffer_index_r: usize = 0;
+        const buffer_index: usize = 0;
 
         const delay_table_index_l: usize = 0;
         const delay_table_index_r: usize = delay_table_length / 4;
@@ -4349,8 +4174,7 @@ const Chorus = struct {
             .buffer_l = buffer_l,
             .buffer_r = buffer_r,
             .delay_table = delay_table,
-            .buffer_index_l = buffer_index_l,
-            .buffer_index_r = buffer_index_r,
+            .buffer_index = buffer_index,
             .delay_table_index_l = delay_table_index_l,
             .delay_table_index_r = delay_table_index_r,
         };
@@ -4371,86 +4195,69 @@ const Chorus = struct {
         const delay_table_length = self.delay_table.len;
         const input_length = input_left.len;
 
-        {
-            var t: usize = 0;
-            while (t < input_length) : (t += 1) {
-                var position = @intToFloat(f64, self.buffer_index_l) - @floatCast(f64, self.delay_table[self.delay_table_index_l]);
+        for (0..input_length) |t| {
+            {
+                var position = @as(f64, @floatFromInt(self.buffer_index)) - @as(f64, @floatCast(self.delay_table[self.delay_table_index_l]));
                 if (position < 0.0) {
-                    position += @intToFloat(f64, buffer_length);
+                    position += @as(f64, @floatFromInt(buffer_length));
                 }
 
-                var index1 = @floatToInt(usize, position);
+                const index1 = @as(usize, @intFromFloat(position));
                 var index2 = index1 + 1;
                 if (index2 == buffer_length) {
                     index2 = 0;
                 }
 
-                const x1 = @floatCast(f64, self.buffer_l[index1]);
-                const x2 = @floatCast(f64, self.buffer_l[index2]);
-                const a = position - @intToFloat(f64, index1);
-                output_left[t] = @floatCast(f32, x1 + a * (x2 - x1));
-
-                self.buffer_l[self.buffer_index_l] = input_left[t];
-                self.buffer_index_l += 1;
-                if (self.buffer_index_l == buffer_length) {
-                    self.buffer_index_l = 0;
-                }
+                const x1: f64 = @floatCast(self.buffer_l[index1]);
+                const x2: f64 = @floatCast(self.buffer_l[index2]);
+                const a = position - @as(f64, @floatFromInt(index1));
+                output_left[t] = @floatCast(x1 + a * (x2 - x1));
 
                 self.delay_table_index_l += 1;
                 if (self.delay_table_index_l == delay_table_length) {
                     self.delay_table_index_l = 0;
                 }
             }
-        }
 
-        {
-            var t: usize = 0;
-            while (t < input_length) : (t += 1) {
-                var position = @intToFloat(f64, self.buffer_index_r) - @floatCast(f64, self.delay_table[self.delay_table_index_r]);
+            {
+                var position = @as(f64, @floatFromInt(self.buffer_index)) - @as(f64, @floatCast(self.delay_table[self.delay_table_index_r]));
                 if (position < 0.0) {
-                    position += @intToFloat(f64, buffer_length);
+                    position += @floatFromInt(buffer_length);
                 }
 
-                var index1 = @floatToInt(usize, position);
-                var index2 = index1 + 1;
+                const index1: usize = @intFromFloat(position);
+                var index2: usize = index1 + 1;
                 if (index2 == buffer_length) {
                     index2 = 0;
                 }
 
-                const x1 = @floatCast(f64, self.buffer_r[index1]);
-                const x2 = @floatCast(f64, self.buffer_r[index2]);
-                const a = position - @intToFloat(f64, index1);
-                output_right[t] = @floatCast(f32, x1 + a * (x2 - x1));
-
-                self.buffer_r[self.buffer_index_r] = input_right[t];
-                self.buffer_index_r += 1;
-                if (self.buffer_index_r == buffer_length) {
-                    self.buffer_index_r = 0;
-                }
+                const x1: f64 = @floatCast(self.buffer_r[index1]);
+                const x2: f64 = @floatCast(self.buffer_r[index2]);
+                const a = position - @as(f64, @floatFromInt(index1));
+                output_right[t] = @floatCast(x1 + a * (x2 - x1));
 
                 self.delay_table_index_r += 1;
                 if (self.delay_table_index_r == delay_table_length) {
                     self.delay_table_index_r = 0;
                 }
             }
+
+            self.buffer_l[self.buffer_index] = input_left[t];
+            self.buffer_r[self.buffer_index] = input_right[t];
+            self.buffer_index += 1;
+            if (self.buffer_index == buffer_length) {
+                self.buffer_index = 0;
+            }
         }
     }
 
     fn mute(self: *Self) void {
-        const buffer_length = self.buffer_l.len;
-
-        {
-            var t: usize = 0;
-            while (t < buffer_length) : (t += 1) {
-                self.buffer_l[t] = 0.0;
-            }
+        for (self.buffer_l) |*value| {
+            value.* = 0.0;
         }
-
-        {
-            var t: usize = 0;
-            while (t < buffer_length) : (t += 1) {
-                self.buffer_r[t] = 0.0;
-            }
+        for (self.buffer_r) |*value| {
+            value.* = 0.0;
         }
     }
 };
+

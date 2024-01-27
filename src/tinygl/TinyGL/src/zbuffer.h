@@ -149,5 +149,8 @@ typedef void (*ZB_fillTriangleFunc)(ZBuffer  *,
 void gl_free(void *p);
 void *gl_malloc(int size);
 void *gl_zalloc(int size);
+void *gl_memcpy(void *dst, const void *src, int n);
+
+#define memcpy gl_memcpy
 
 #endif /* _tgl_zbuffer_h_ */

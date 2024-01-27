@@ -96,13 +96,13 @@ export fn mouseClickEvent(x: f32, y: f32, down: bool) void {
 
             inDrag = false;
 
-            const start_pix_x = std.math.min(x1, x2);
-            const start_pix_y = std.math.min(y1, y2);
-            const end_pix_x = std.math.max(x1, x2);
-            const end_pix_y = std.math.max(y1, y2);
+            const start_pix_x = @min(x1, x2);
+            const start_pix_y = @min(y1, y2);
+            const end_pix_x = @max(x1, x2);
+            const end_pix_y = @max(y1, y2);
 
-            const w = @intToFloat(f32, WIDTH);
-            const h = @intToFloat(f32, HEIGHT);
+            const w:f32 = @floatFromInt(WIDTH);
+            const h:f32 = @floatFromInt(HEIGHT);
 
             const imag_w = (zoom.right - zoom.left);
             const imag_h = (zoom.top - zoom.bottom);
@@ -125,7 +125,7 @@ export fn mouseClickEvent(x: f32, y: f32, down: bool) void {
 }
 
 export fn getGfxBufPtr() [*]u8 {
-    return @ptrCast([*]u8, &gfxFramebuffer);
+    return @ptrCast(&gfxFramebuffer);
 }
 
 export fn setSampleRate(s: f32) void {
@@ -133,11 +133,11 @@ export fn setSampleRate(s: f32) void {
 }
 
 export fn getLeftBufPtr() [*]u8 {
-    return @ptrCast([*]u8, &mix_left);
+    return @ptrCast(&mix_left);
 }
 
 export fn getRightBufPtr() [*]u8 {
-    return @ptrCast([*]u8, &mix_right);
+    return @ptrCast(&mix_right);
 }
 
 export fn renderSoundQuantum() void {}
@@ -197,7 +197,7 @@ fn fillRect(xpos: i32, ypos: i32, width: i32, height: i32, colour: u32) void {
     while (y < y2a) : (y += 1) {
         var xi = x;
         while (xi < x2a) : (xi += 1) {
-            gfxFramebuffer[@intCast(usize, y) * WIDTH + @intCast(usize, xi)] = colour;
+            gfxFramebuffer[@as(usize, @intCast(y)) * WIDTH + @as(usize, @intCast(xi))] = colour;
         }
     }
 }
@@ -212,8 +212,8 @@ fn redraw() void {
     while (pix_y < HEIGHT) : (pix_y += 1) {
         var pix_x: u31 = 0;
         while (pix_x < WIDTH) : (pix_x += 1) {
-            const cx = zoom.left + @intToFloat(f64, pix_x) / w * imag_w;
-            const cy = zoom.bottom + @intToFloat(f64, pix_y) / h * imag_h;
+            const cx = zoom.left + @as(f64, @floatFromInt(pix_x)) / w * imag_w;
+            const cy = zoom.bottom + @as(f64, @floatFromInt(pix_y)) / h * imag_h;
 
             var zx1 = cx;
             var zy1 = cy;
@@ -232,8 +232,8 @@ fn redraw() void {
 
             if (escaped) {
                 const r8: u8 = 0;
-                const g8: u8 = @intCast(u8, iterations);
-                const b8: u8 = 255 - @intCast(u8, iterations);
+                const g8: u8 = @intCast(iterations);
+                const b8: u8 = 255 - @as(u8, @intCast(iterations));
                 renderBuffer[pix_y * WIDTH + pix_x] = 0xFF000000 | @as(u32, b8) << 16 | @as(u32, g8) << 8 | @as(u32, r8);
             } else {
                 renderBuffer[pix_y * WIDTH + pix_x] = 0xFF000000;
@@ -245,14 +245,14 @@ fn redraw() void {
 export fn renderGfx() void {
     printFPS();
 
-    std.mem.copy(u32, &gfxFramebuffer, &renderBuffer);
+    @memcpy(&gfxFramebuffer, &renderBuffer);
 
     if (inDrag) {
-        const start_pix_x = std.math.min(x1, x2);
-        const start_pix_y = std.math.min(y1, y2);
-        const end_pix_x = std.math.max(x1, x2);
-        const end_pix_y = std.math.max(y1, y2);
+        const start_pix_x = @min(x1, x2);
+        const start_pix_y = @min(y1, y2);
+        const end_pix_x = @max(x1, x2);
+        const end_pix_y = @max(y1, y2);
 
-        fillRect(@floatToInt(i32, start_pix_x), @floatToInt(i32, start_pix_y), @floatToInt(i32, end_pix_x - start_pix_x), @floatToInt(i32, end_pix_y - start_pix_y), 0xFF808080);
+        fillRect(@intFromFloat(start_pix_x), @intFromFloat(start_pix_y), @intFromFloat(end_pix_x - start_pix_x), @intFromFloat(end_pix_y - start_pix_y), 0xFF808080);
     }
 }

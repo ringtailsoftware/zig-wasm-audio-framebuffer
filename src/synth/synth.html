@@ -45,7 +45,7 @@
     import { WasmPcm } from "./wasmpcm.js";
 
     window.addEventListener('load', async () => {
-        await WasmPcm.init('lib/synth.wasm');
+        await WasmPcm.init('bin/synth.wasm');
         const buttonEl = document.getElementById('button-start');
         buttonEl.innerHTML = "Start";
         buttonEl.disabled = false;

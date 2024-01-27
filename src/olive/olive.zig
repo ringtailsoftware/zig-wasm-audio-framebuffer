@@ -57,7 +57,7 @@ const Ball = struct {
     }
 
     pub fn render(self: *const Self, renderer: *Renderer) void {
-        renderer.sprite_blend(&spriteSurface, @floatToInt(i32, self.pos.x), @floatToInt(i32, self.pos.y), 64, 64);
+        renderer.sprite_blend(&spriteSurface, @intFromFloat(self.pos.x), @intFromFloat(self.pos.y), 64, 64);
     }
 };
 
@@ -94,7 +94,7 @@ export fn keyevent(keycode: u32, down: bool) void {
 }
 
 export fn getGfxBufPtr() [*]u8 {
-    return @ptrCast([*]u8, &gfxFramebuffer);
+    return @ptrCast(&gfxFramebuffer);
 }
 
 export fn setSampleRate(s: f32) void {
@@ -102,11 +102,11 @@ export fn setSampleRate(s: f32) void {
 }
 
 export fn getLeftBufPtr() [*]u8 {
-    return @ptrCast([*]u8, &mix_left);
+    return @ptrCast(&mix_left);
 }
 
 export fn getRightBufPtr() [*]u8 {
-    return @ptrCast([*]u8, &mix_right);
+    return @ptrCast(&mix_right);
 }
 
 export fn renderSoundQuantum() void {}
@@ -125,15 +125,19 @@ export fn init() void {
     gSurface = Surface.init(&gfxFramebuffer, WIDTH, HEIGHT);
     gRenderer = Renderer.init(&gSurface);
 
-    std.mem.copy(u32, &sprBuf, std.mem.bytesAsSlice(u32, @alignCast(4, spriteData)));
+    @memcpy(&sprBuf, @as([*]const u32, @ptrCast(@alignCast(spriteData))));
+
     spriteSurface = Surface.init(&sprBuf, 64, 64);
 
     gRenderer.fill(0xFF000000);
 
     for (&balls) |*ball| {
-        ball.* = Ball.init(vec2(rand.float(f32) * @as(f32, WIDTH), rand.float(f32) * @as(f32, HEIGHT)), vec2(rand.float(f32) * 4 - 2, rand.float(f32) * 4 - 2), @floatToInt(i32, (rand.float(f32) * 10 + 2)), randColour());
+        ball.* = Ball.init(vec2(rand.float(f32) * @as(f32, WIDTH), rand.float(f32) * @as(f32, HEIGHT)), vec2(rand.float(f32) * 4 - 2, rand.float(f32) * 4 - 2), @intFromFloat((rand.float(f32) * 10 + 2)), randColour());
     }
 }
+
+
+var buf: [16]u8 = undefined;
 
 export fn update(deltaMs: u32) void {
     _ = deltaMs;
@@ -145,8 +149,7 @@ export fn update(deltaMs: u32) void {
         ball.step();
         ball.render(&gRenderer);
     }
-    var buf: [16]u8 = undefined;
-    _ = std.fmt.bufPrint(&buf, "{d}", .{lastFPS}) catch 0;
+    _ = std.fmt.bufPrint(&buf, "{d}", .{lastFPS}) catch return;
     gRenderer.text(0, 0, &buf);
 }
 

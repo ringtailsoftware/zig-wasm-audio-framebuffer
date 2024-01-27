@@ -816,6 +816,7 @@ OLIVECDEF void olivec_text(Olivec_Canvas oc, const char *text, int tx, int ty, O
         int gx = tx + i*font.width*glyph_size;
         int gy = ty;
         const char *glyph = &font.glyphs[(*text)*sizeof(char)*font.width*font.height];
+
         for (int dy = 0; (size_t) dy < font.height; ++dy) {
             for (int dx = 0; (size_t) dx < font.width; ++dx) {
                 int px = gx + dx*glyph_size;

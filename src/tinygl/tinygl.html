@@ -20,7 +20,7 @@
     import { WasmPcm } from "./wasmpcm.js";
 
     window.addEventListener('load', async () => {
-        await WasmPcm.init('lib/tinygl.wasm');
+        await WasmPcm.init('bin/tinygl.wasm');
         const buttonEl = document.getElementById('button-start');
         buttonEl.innerHTML = "Start";
         buttonEl.disabled = false;

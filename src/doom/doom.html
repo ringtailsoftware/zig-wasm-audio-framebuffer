@@ -20,7 +20,7 @@
     import { WasmPcm } from "./wasmpcm.js";
 
     window.addEventListener('load', async () => {
-        await WasmPcm.init('lib/doom.wasm', 22050);
+        await WasmPcm.init('bin/doom.wasm', 22050);
         const buttonEl = document.getElementById('button-start');
         buttonEl.innerHTML = "Start";
         buttonEl.disabled = false;
