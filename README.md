@@ -4,7 +4,7 @@ Toby Jaffey https://mastodon.me.uk/@tobyjaffey
 
 Straightforward examples of integrating Zig and Wasm for audio and graphics on the web.
 
-Compiling against Zig v0.12. Currently, MIDI synthesis examples (using Ziggysynth) are broken and have been disabled.
+Compiling against Zig v0.12.
 
 ## Aims
 
