@@ -253,10 +253,7 @@ export fn update(deltaMs: u32) void {
             if (command == 0xC0 and data1 == 34) {
                 data1 = 35;
             }
-            // FIXME audio broken in zig v0.12 with ziggysynth, uncomment to test
-            _ = data2;
-            _ = channel;
-            //synthesizer.processMidiMessage(channel, command, data1, data2);
+            synthesizer.processMidiMessage(channel, command, data1, data2);
         }
     }
 }

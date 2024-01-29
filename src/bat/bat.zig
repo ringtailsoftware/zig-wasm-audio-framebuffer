@@ -146,10 +146,7 @@ export fn getRightBufPtr() [*]u8 {
 }
 
 export fn renderSoundQuantum() void {
-    // uncomment to use broken ziggysynth
-    @memset(&fx_left, 0);
-    @memset(&fx_right, 0);
-    //synthesizer.render(&fx_left, &fx_right);
+    synthesizer.render(&fx_left, &fx_right);
 
     var bytes: usize = RENDER_QUANTUM_FRAMES * 4 * 2;
 

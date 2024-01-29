@@ -84,7 +84,7 @@ fn ReadCounter(comptime T: type) type {
 
         fn skipBytes(self: *Self, num_bytes: u64, options: anytype) !void {
             try self.reader.skipBytes(num_bytes, options);
-            self.count += @as(usize, @intCast(num_bytes));
+            self.count += @truncate(num_bytes);
         }
     };
 }
@@ -2643,7 +2643,7 @@ const Oscillator = struct {
         const data = self.data.?;
 
         for (block, 0..block.len) |*dst, t| {
-            const index: usize = @bitCast(@as(usize, @intCast(self.position_fp)) >> Oscillator.FRAC_BITS);
+            const index: usize = @intCast(self.position_fp >> Oscillator.FRAC_BITS);
 
             if (index >= self.end) {
                 if (t > 0) {
@@ -2678,7 +2678,7 @@ const Oscillator = struct {
                 self.position_fp -= loop_length_fp;
             }
 
-            const index1: usize = @bitCast(@as(usize, @intCast(self.position_fp)) >> Oscillator.FRAC_BITS);
+            const index1: usize = @intCast(self.position_fp >> Oscillator.FRAC_BITS);
             var index2 = index1 + 1;
             if (index2 >= self.end_loop) {
                 index2 -= loop_length;
@@ -4260,4 +4260,3 @@ const Chorus = struct {
         }
     }
 };
-
