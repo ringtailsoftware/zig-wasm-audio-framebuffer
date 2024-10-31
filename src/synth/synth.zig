@@ -13,18 +13,20 @@ var right: [RENDER_QUANTUM_FRAMES]f32 = undefined;
 var sampleRate: f32 = 44100;
 var synthesizer: Synthesizer = undefined;
 
-pub const std_options = struct {
-    pub fn logFn(
-        comptime message_level: std.log.Level,
-        comptime scope: @TypeOf(.enum_literal),
-        comptime format: []const u8,
-        args: anytype,
-    ) void {
-        _ = message_level;
-        _ = scope;
-        _ = format;
-        _ = args;
-    }
+pub fn logFn(
+    comptime message_level: std.log.Level,
+    comptime scope: @TypeOf(.enum_literal),
+    comptime format: []const u8,
+    args: anytype,
+) void {
+    _ = message_level;
+    _ = scope;
+    _ = format;
+    _ = args;
+}
+
+pub const std_options: std.Options = .{
+    .logFn = logFn,
 };
 
 export fn noteOn(note: i32, vel: i32) void {

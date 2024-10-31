@@ -5,7 +5,7 @@ const opt = std.builtin.OptimizeMode.ReleaseFast;
 fn addExample(b: *std.Build, comptime name: []const u8, flags: ?[]const []const u8, sources: ?[]const []const u8, includes: ?[]const []const u8) void {
     const exe = b.addExecutable(.{
         .name = name,
-        .root_source_file = .{ .path = "src/" ++ name ++ "/" ++ name ++ ".zig" },
+        .root_source_file = b.path("src/" ++ name ++ "/" ++ name ++ ".zig"),
         .target = b.resolveTargetQuery(std.zig.CrossTarget.parse(
             .{ .arch_os_abi = "wasm32-freestanding" },
         ) catch unreachable),
@@ -13,11 +13,11 @@ fn addExample(b: *std.Build, comptime name: []const u8, flags: ?[]const []const 
     });
     exe.entry = .disabled;
     exe.rdynamic = true;
-    exe.addIncludePath(.{ .path = "src/" ++ name });
+    exe.addIncludePath(b.path("src/" ++ name));
 
     if (includes != null) {
         for (includes.?) |inc| {
-            exe.addIncludePath(.{ .path = inc });
+            exe.addIncludePath(b.path(inc));
         }
     }
     if (flags != null and sources != null) {

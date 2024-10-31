@@ -66,17 +66,19 @@ fn game_init() void {
     batxd = 0;
 }
 
-pub const std_options = struct {
-    pub fn logFn(
-        comptime message_level: std.log.Level,
-        comptime scope: @TypeOf(.enum_literal),
-        comptime format: []const u8,
-        args: anytype,
-    ) void {
-        _ = message_level;
-        _ = scope;
-        _ = console.print(format, args) catch 0;
-    }
+pub fn logFn(
+    comptime message_level: std.log.Level,
+    comptime scope: @TypeOf(.enum_literal),
+    comptime format: []const u8,
+    args: anytype,
+) void {
+    _ = message_level;
+    _ = scope;
+    _ = console.print(format, args) catch 0;
+}
+
+pub const std_options: std.Options = .{
+    .logFn = logFn,
 };
 
 pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {
