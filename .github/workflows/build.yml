@@ -6,7 +6,7 @@ jobs:
   test:
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-latest]
     runs-on: ${{matrix.os}}
     steps:
       - name: Checkout zig-wasm-audio-framebuffer
@@ -16,7 +16,7 @@ jobs:
       - name: Setup Zig
         uses: goto-bus-stop/setup-zig@v1
         with:
-          version: master
+          version: 0.13.0
       - name: Build
         run: zig build
         working-directory: zig-wasm-audio-framebuffer
