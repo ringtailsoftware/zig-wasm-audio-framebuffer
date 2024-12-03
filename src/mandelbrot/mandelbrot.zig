@@ -14,7 +14,7 @@ var mix_right: [RENDER_QUANTUM_FRAMES]f32 = undefined;
 
 var startTime: u32 = 0;
 
-const MAX_ITERATIONS = 256;
+const MAX_ITERATIONS = 1024;
 
 pub fn logFn(
     comptime message_level: std.log.Level,
