@@ -25,6 +25,7 @@ Visit https://ringtailsoftware.github.io/zig-wasm-audio-framebuffer
  - Doom, Doom1 Shareware, keyboard control, MIDI music, sound effects
  - TinyGL, software GL renderer in Wasm
  - OliveC, graphics library with sprite blit, circle, rectangle, line, etc.
+ - Agnes, NES emulator (no sound)
 
 # Build and test
 
