@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>agnes</title>
+    <style>
+    canvas {
+        width: 256px;
+        height: 240px;
+        image-rendering: crisp-edges;
+        border-style: solid;
+    }
+
+    </style>
+</head>
+
+<script src="coi-serviceworker.js"></script>
+
+<script type="module" defer="true">
+    import { WasmPcm } from "./wasmpcm.js";
+
+    window.addEventListener('load', async () => {
+        await WasmPcm.init('bin/agnes.wasm');
+        const buttonEl = document.getElementById('button-start');
+        buttonEl.innerHTML = "Start";
+        buttonEl.disabled = false;
+        buttonEl.addEventListener('click', async () => {
+            await WasmPcm.start();
+
+            buttonEl.style.visibility = 'hidden';
+            let canvasEl = document.getElementById('canvas');
+            canvasEl.style.display = 'block';
+        }, false);
+    });
+
+</script>
+
+<body>
+    <p>
+        <button id="button-start" disabled>Loading</button>
+        <canvas id="canvas" width=256 height=240 style="display:none;width:512px;height:480px;">
+    </p>
+    <p>
+        Graphics only, agnes does not support sound.<br>
+        Replace ROM file in build to play any NES game<br>
+
+        Z = A, X = B, Shift = SELECT, Enter = START
+    </p>
+<hr><a href="https://github.com/ringtailsoftware/zig-wasm-audio-framebuffer/">https://github.com/ringtailsoftware/zig-wasm-audio-framebuffer/</a>
+</body>
+
+</html>
