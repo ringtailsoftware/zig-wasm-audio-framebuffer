@@ -138,7 +138,6 @@ export fn init() void {
     }
 }
 
-
 var buf: [16]u8 = undefined;
 
 export fn update(deltaMs: u32) void {

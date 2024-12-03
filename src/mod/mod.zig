@@ -33,7 +33,7 @@ export fn renderSoundQuantum() void {
     var bytes: usize = RENDER_QUANTUM_FRAMES * 4 * 2;
 
     // pocketmod produces interleaved l/r/l/r data, so fetch a double batch
-    const lrbuf:[*]u8 = @ptrCast(&leftright);
+    const lrbuf: [*]u8 = @ptrCast(&leftright);
     bytes = RENDER_QUANTUM_FRAMES * 4 * 2;
     var i: usize = 0;
     while (i < bytes) {

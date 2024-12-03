@@ -153,7 +153,7 @@ export fn renderSoundQuantum() void {
     var bytes: usize = RENDER_QUANTUM_FRAMES * 4 * 2;
 
     // pocketmod produces interleaved l/r/l/r data, so fetch a double batch
-    const lrbuf:[*]u8 = @ptrCast(&music_leftright);
+    const lrbuf: [*]u8 = @ptrCast(&music_leftright);
     bytes = RENDER_QUANTUM_FRAMES * 4 * 2;
     var i: usize = 0;
     while (i < bytes) {
@@ -326,9 +326,9 @@ fn HSVtoRGB(h: f32, s: f32, v: f32) u32 {
     const rf = std.math.round(r * 255);
     const gf = std.math.round(g * 255);
     const bf = std.math.round(b * 255);
-    const r8:u8 = @intFromFloat(rf);
-    const g8:u8 = @intFromFloat(gf);
-    const b8:u8 = @intFromFloat(bf);
+    const r8: u8 = @intFromFloat(rf);
+    const g8: u8 = @intFromFloat(gf);
+    const b8: u8 = @intFromFloat(bf);
     const colour: u32 = 0xFF000000 | @as(u32, b8) << 16 | @as(u32, g8) << 8 | @as(u32, r8);
     return colour;
 }

@@ -80,13 +80,13 @@ export fn doom_malloc_impl(size: c_int) callconv(.C) ?[*]u8 {
         _ = console.print("ALLOCFAIL", .{}) catch 0;
         return null;
     };
-    const sz:*usize = @ptrCast(@alignCast(mem.ptr));
+    const sz: *usize = @ptrCast(@alignCast(mem.ptr));
     sz.* = @intCast(size);
     return mem.ptr + @sizeOf(usize);
 }
 
 export fn doom_free_impl(ptr: [*]u8) callconv(.C) void {
-    const sz:*const usize = @ptrCast(@alignCast(ptr - @sizeOf(usize)));
+    const sz: *const usize = @ptrCast(@alignCast(ptr - @sizeOf(usize)));
     const p = ptr - @sizeOf(usize);
     allocator.free(p[0 .. sz.* + @sizeOf(usize)]);
 }
@@ -279,7 +279,6 @@ export fn renderGfx() void {
     const fb: [*]const u8 = pd.doom_get_framebuffer(4);
     const fb32 = @as([*]const u32, @ptrCast(@alignCast(fb)))[0 .. WIDTH * HEIGHT];
     @memcpy(&gfxFramebuffer, fb32);
-
 }
 
 fn keycodeToDoomKey(keycode: u32) pd.doom_key_t {

@@ -103,8 +103,8 @@ export fn mouseClickEvent(x: f32, y: f32, down: bool) void {
             const end_pix_x = @max(x1, x2);
             const end_pix_y = @max(y1, y2);
 
-            const w:f32 = @floatFromInt(WIDTH);
-            const h:f32 = @floatFromInt(HEIGHT);
+            const w: f32 = @floatFromInt(WIDTH);
+            const h: f32 = @floatFromInt(HEIGHT);
 
             const imag_w = (zoom.right - zoom.left);
             const imag_h = (zoom.top - zoom.bottom);

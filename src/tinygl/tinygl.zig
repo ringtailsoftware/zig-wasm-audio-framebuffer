@@ -241,7 +241,7 @@ export fn gl_malloc(size: c_int) callconv(.C) ?[*]u8 {
         _ = console.print("ALLOCFAIL", .{}) catch 0;
         return null;
     };
-    const sz:*usize = @ptrCast(@alignCast(mem.ptr));
+    const sz: *usize = @ptrCast(@alignCast(mem.ptr));
     sz.* = @intCast(size);
     return mem.ptr + @sizeOf(usize);
 }
@@ -249,14 +249,14 @@ export fn gl_malloc(size: c_int) callconv(.C) ?[*]u8 {
 export fn gl_zalloc(size: c_int) callconv(.C) ?[*]u8 {
     const mem: ?[*]u8 = gl_malloc(size);
     if (mem != null) {
-        const mems = mem.?[0 .. @intCast(size)];
+        const mems = mem.?[0..@intCast(size)];
         @memset(mems, 0x00);
     }
     return mem;
 }
 
 export fn gl_free(ptr: [*]u8) callconv(.C) void {
-    const sz:*const usize = @ptrCast(@alignCast(ptr - @sizeOf(usize)));
+    const sz: *const usize = @ptrCast(@alignCast(ptr - @sizeOf(usize)));
     const p = ptr - @sizeOf(usize);
     allocator.free(p[0 .. sz.* + @sizeOf(usize)]);
 }

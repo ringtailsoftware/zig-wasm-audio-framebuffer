@@ -4,8 +4,8 @@ const agnes = @cImport({
     @cInclude("agnes.h");
 });
 
-var ag:?*agnes.agnes_t = null;
-var ag_input:agnes.agnes_input_t = undefined;
+var ag: ?*agnes.agnes_t = null;
+var ag_input: agnes.agnes_input_t = undefined;
 
 const romData = @embedFile("croom.nes");
 
@@ -70,7 +70,7 @@ export fn agnes_memcpy(dst: [*]u8, src: [*]u8, size: c_int) callconv(.C) [*]u8 {
     return dst;
 }
 
-export fn agnes_memset(dst: [*]u8, val:u8, size: c_int) callconv(.C) void {
+export fn agnes_memset(dst: [*]u8, val: u8, size: c_int) callconv(.C) void {
     @memset(dst[0..@intCast(size)], val);
 }
 
@@ -79,13 +79,13 @@ export fn agnes_malloc(size: c_int) callconv(.C) ?[*]u8 {
         _ = console.print("ALLOCFAIL", .{}) catch 0;
         return null;
     };
-    const sz:*usize = @ptrCast(@alignCast(mem.ptr));
+    const sz: *usize = @ptrCast(@alignCast(mem.ptr));
     sz.* = @intCast(size);
     return mem.ptr + @sizeOf(usize);
 }
 
 export fn agnes_free(ptr: [*]u8) callconv(.C) void {
-    const sz:*const usize = @ptrCast(@alignCast(ptr - @sizeOf(usize)));
+    const sz: *const usize = @ptrCast(@alignCast(ptr - @sizeOf(usize)));
     const p = ptr - @sizeOf(usize);
     allocator.free(p[0 .. sz.* + @sizeOf(usize)]);
 }
@@ -95,31 +95,29 @@ pub fn millis() u32 {
     return (getTimeUs() - startTime) / 1000;
 }
 
-
 export fn keyevent(keycode: u32, down: bool) void {
-//_ = console.print("keycode {d} {any}\n", .{keycode, down}) catch 0;
+    //_ = console.print("keycode {d} {any}\n", .{keycode, down}) catch 0;
     ag_input.a = false;
     ag_input.b = false;
     ag_input.left = false;
     ag_input.right = false;
     ag_input.up = false;
     ag_input.down = false;
-    ag_input.select = false;   // shift
-    ag_input.start = false;    // enter
+    ag_input.select = false; // shift
+    ag_input.start = false; // enter
 
-    switch(keycode) {
+    switch (keycode) {
         90 => ag_input.a = down,
         88 => ag_input.b = down,
         37 => ag_input.left = down,
         39 => ag_input.right = down,
         38 => ag_input.up = down,
         40 => ag_input.down = down,
-        17 => ag_input.select = down,   // shift
-        13 => ag_input.start = down,    // enter
+        17 => ag_input.select = down, // shift
+        13 => ag_input.start = down, // enter
         else => {},
     }
     agnes.agnes_set_input(ag, &ag_input, 0);
-
 }
 
 export fn getGfxBufPtr() [*]u8 {
@@ -138,8 +136,7 @@ export fn getRightBufPtr() [*]u8 {
     return @ptrCast(&mix_right);
 }
 
-export fn renderSoundQuantum() void {
-}
+export fn renderSoundQuantum() void {}
 
 export fn init() void {
     startTime = getTimeUs();
@@ -185,7 +182,6 @@ fn printFPS() void {
     frameCount +%= 1;
     lastTime = millis();
 }
-
 
 export fn renderGfx() void {
     // background

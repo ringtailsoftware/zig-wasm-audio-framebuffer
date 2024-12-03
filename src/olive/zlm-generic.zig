@@ -655,7 +655,7 @@ pub fn SpecializeOn(comptime Real: type) type {
             /// only works on float matrices
             pub fn invert(src: Self) ?Self {
                 // https://github.com/stackgl/gl-mat4/blob/master/invert.js
-                const a:[16]Real = @bitCast(src.fields);
+                const a: [16]Real = @bitCast(src.fields);
 
                 const a00 = a[0];
                 const a01 = a[1];
