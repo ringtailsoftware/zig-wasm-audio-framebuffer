@@ -26,14 +26,9 @@ Visit https://ringtailsoftware.github.io/zig-wasm-audio-framebuffer
  - TinyGL, software GL renderer in Wasm
  - OliveC, graphics library with sprite blit, circle, rectangle, line, etc.
 
-# Build and test (assumes you have zig installed)
+# Build and test
 
-    zig build
-    cd zig-out && python3 -m http.server 8000
-
-# Build and test via docker
-
-    make
+    zig build && zig build serve -- zig-out -p 8000
 
 Browse to http://localhost:8000
 

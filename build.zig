@@ -88,4 +88,34 @@ pub fn build(b: *std.Build) void {
     addExample(b, "mandelbrot", null, null, null);
 
     addExample(b, "olive", &.{"-Wall"}, &.{"src/olive/olive.c/olive.c"}, null);
+
+    const target = b.standardTargetOptions(.{});
+    const optimize = b.standardOptimizeOption(.{});
+    // web server
+    const serve_exe = b.addExecutable(.{
+        .name = "serve",
+        .root_source_file = b.path("httpserver/serve.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const mod_server = b.addModule("StaticHttpFileServer", .{
+        .root_source_file = b.path("httpserver/root.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    mod_server.addImport("mime", b.dependency("mime", .{
+        .target = target,
+        .optimize = optimize,
+    }).module("mime"));
+
+    serve_exe.root_module.addImport("StaticHttpFileServer", mod_server);
+
+    const run_serve_exe = b.addRunArtifact(serve_exe);
+    if (b.args) |args| run_serve_exe.addArgs(args);
+
+    const serve_step = b.step("serve", "Serve a directory of files");
+    serve_step.dependOn(&run_serve_exe.step);
+
 }
