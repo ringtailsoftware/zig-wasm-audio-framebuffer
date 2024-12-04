@@ -20,7 +20,7 @@ var music_right: [RENDER_QUANTUM_FRAMES]f32 = undefined;
 var mix_left: [RENDER_QUANTUM_FRAMES]f32 = undefined;
 var mix_right: [RENDER_QUANTUM_FRAMES]f32 = undefined;
 var music_leftright: [RENDER_QUANTUM_FRAMES * 2]f32 = undefined;
-var sampleRate: f32 = 44100;
+var sampleRate: f32 = 22050;
 var synthesizer: Synthesizer = undefined;
 
 const WIDTH = 320;

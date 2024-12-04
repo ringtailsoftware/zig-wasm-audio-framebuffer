@@ -91,6 +91,7 @@ export class WasmPcm {
 
     static async init(wasmFile, sampleRate) {
         if (sampleRate) {
+            console.log("Configuring AudioContext sampleRate = ", sampleRate);
             audioContext = new AudioContext({sampleRate:sampleRate});
         } else {
             audioContext = new AudioContext();
@@ -113,7 +114,6 @@ export class WasmPcm {
         }).catch((err) => {
             console.log(err);
         });
-
         
         await audioContext.audioWorklet.addModule('pcm-processor.js');
 
@@ -135,6 +135,7 @@ export class WasmPcm {
         }
 
         if (globalInstance.exports.setSampleRate) {
+            console.log("Setting synth sampleRate = ", audioContext.sampleRate);
             globalInstance.exports.setSampleRate(audioContext.sampleRate);
         }
 
