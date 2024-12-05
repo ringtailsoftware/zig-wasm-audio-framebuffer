@@ -1,14 +1,16 @@
 const std = @import("std");
 
 const opt = std.builtin.OptimizeMode.ReleaseFast;
+//const opt = std.builtin.OptimizeMode.Debug;
 
 fn addExample(b: *std.Build, comptime name: []const u8, flags: ?[]const []const u8, sources: ?[]const []const u8, includes: ?[]const []const u8) void {
+    const target = b.resolveTargetQuery(std.zig.CrossTarget.parse(
+            .{ .arch_os_abi = "wasm32-freestanding" },
+        ) catch unreachable);
     const exe = b.addExecutable(.{
         .name = name,
         .root_source_file = b.path("src/" ++ name ++ "/" ++ name ++ ".zig"),
-        .target = b.resolveTargetQuery(std.zig.CrossTarget.parse(
-            .{ .arch_os_abi = "wasm32-freestanding" },
-        ) catch unreachable),
+        .target = target,
         .optimize = opt,
     });
     exe.entry = .disabled;
@@ -26,6 +28,15 @@ fn addExample(b: *std.Build, comptime name: []const u8, flags: ?[]const []const 
             .flags = flags.?,
         });
     }
+
+    // add zeptolibc
+    const zeptolibc_dep = b.dependency("zeptolibc", .{
+        .target = target,
+        .optimize = opt,
+    });
+    exe.root_module.addImport("zeptolibc", zeptolibc_dep.module("zeptolibc"));
+    exe.addIncludePath(zeptolibc_dep.path("src/"));
+    exe.addIncludePath(b.path("src/"));
 
     b.installFile("src/" ++ name ++ "/" ++ name ++ ".html", name ++ ".html");
 

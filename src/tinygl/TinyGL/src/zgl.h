@@ -1,18 +1,19 @@
 #ifndef _tgl_zgl_h_
 #define _tgl_zgl_h_
 
+#include "zeptolibc.h"
+
 #define NULL ((void *)0)
 #define M_PI 3.14159265358979323846264338328
 
 #define assert(X) // FIXME
 
-extern double zsin(double x);
-extern double zfloor(double x);
-extern double zcos(double x);
-extern double zfabs(double x);
-extern double zsqrt(double x);
-extern double zpow(double x, double y);
-extern void *gl_memcpy(void *dst, const void *src, int n);
+#define zsin sin
+#define zfloor floor
+#define zcos cos
+#define zfabs fabs
+#define zsqrt sqrt
+#define zpow pow
 
 //#include <stdlib.h>
 //#include <stdio.h>

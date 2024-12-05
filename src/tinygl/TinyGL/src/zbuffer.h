@@ -5,6 +5,8 @@
  * Z buffer
  */
 
+#include "zeptolibc.h"
+
 #include "zfeatures.h"
 
 #define ZB_Z_BITS 16
@@ -146,11 +148,15 @@ typedef void (*ZB_fillTriangleFunc)(ZBuffer  *,
 	    ZBufferPoint *,ZBufferPoint *,ZBufferPoint *);
 
 /* memory.c */
-void gl_free(void *p);
-void *gl_malloc(int size);
-void *gl_zalloc(int size);
-void *gl_memcpy(void *dst, const void *src, int n);
+//void gl_free(void *p);
+//void *gl_malloc(int size);
+//void *gl_zalloc(int size);
+//void *gl_memcpy(void *dst, const void *src, int n);
 
-#define memcpy gl_memcpy
+#define gl_memcpy memcpy
+#define gl_malloc malloc
+#define gl_free free
+#define gl_calloc calloc
+#define gl_zalloc(n) calloc(n, 1)
 
 #endif /* _tgl_zbuffer_h_ */
