@@ -1,5 +1,6 @@
 const std = @import("std");
 const console = @import("console.zig").getWriter().writer();
+const zeptolibc = @import("zeptolibc");
 const agnes = @cImport({
     @cInclude("agnes.h");
 });
@@ -53,41 +54,16 @@ pub const std_options: std.Options = .{
     .logFn = logFn,
 };
 
+fn consoleWriteFn(data:[]const u8) void {
+    _ = console.print("{s}", .{data}) catch 0;
+}
+
 pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {
     _ = ret_addr;
     _ = trace;
     @setCold(true);
     _ = console.print("PANIC: {s}", .{msg}) catch 0;
     while (true) {}
-}
-
-export fn agnes_print(msg: [*:0]const u8) callconv(.C) void {
-    _ = console.print("{s}", .{std.mem.span(msg)}) catch 0;
-}
-
-export fn agnes_memcpy(dst: [*]u8, src: [*]u8, size: c_int) callconv(.C) [*]u8 {
-    @memcpy(dst[0..@intCast(size)], src[0..@intCast(size)]);
-    return dst;
-}
-
-export fn agnes_memset(dst: [*]u8, val: u8, size: c_int) callconv(.C) void {
-    @memset(dst[0..@intCast(size)], val);
-}
-
-export fn agnes_malloc(size: c_int) callconv(.C) ?[*]u8 {
-    const mem = allocator.alloc(u8, @intCast(size + @sizeOf(usize))) catch {
-        _ = console.print("ALLOCFAIL", .{}) catch 0;
-        return null;
-    };
-    const sz: *usize = @ptrCast(@alignCast(mem.ptr));
-    sz.* = @intCast(size);
-    return mem.ptr + @sizeOf(usize);
-}
-
-export fn agnes_free(ptr: [*]u8) callconv(.C) void {
-    const sz: *const usize = @ptrCast(@alignCast(ptr - @sizeOf(usize)));
-    const p = ptr - @sizeOf(usize);
-    allocator.free(p[0 .. sz.* + @sizeOf(usize)]);
 }
 
 extern fn getTimeUs() u32;
@@ -141,6 +117,9 @@ export fn renderSoundQuantum() void {}
 export fn init() void {
     startTime = getTimeUs();
     frameCount = 0;
+
+    // init zepto with a memory allocator and console writer
+    zeptolibc.init(allocator, consoleWriteFn);
 
     ag = agnes.agnes_make();
     if (agnes.agnes_load_ines_data(ag, @ptrCast(romData), romData.len)) {
