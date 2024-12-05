@@ -84,7 +84,7 @@ fn ReadCounter(comptime T: type) type {
 
         fn skipBytes(self: *Self, num_bytes: u64, options: anytype) !void {
             try self.reader.skipBytes(num_bytes, options);
-            self.count += @truncate(num_bytes);
+            self.count += @intCast(num_bytes);
         }
     };
 }
@@ -2643,7 +2643,7 @@ const Oscillator = struct {
         const data = self.data.?;
 
         for (block, 0..block.len) |*dst, t| {
-            const index: usize = @intCast(self.position_fp >> Oscillator.FRAC_BITS);
+            var index: usize = @intCast(self.position_fp >> Oscillator.FRAC_BITS);
 
             if (index >= self.end) {
                 if (t > 0) {
@@ -2656,7 +2656,16 @@ const Oscillator = struct {
                 }
             }
 
+            if (index > data.len - 1) {
+                index = data.len - 1;
+            }
+
             const x1: i64 = @intCast(data[index]);
+
+            if (index + 1 > data.len - 1) {
+                index = data.len - 2;
+            }
+
             const x2: i64 = @intCast(data[index + 1]);
             const a_fp = self.position_fp & (Oscillator.FRAC_UNIT - 1);
             dst.* = Oscillator.FP_TO_SAMPLE * @as(f32, @floatFromInt((x1 << Oscillator.FRAC_BITS) + a_fp * (x2 - x1)));
@@ -2678,10 +2687,17 @@ const Oscillator = struct {
                 self.position_fp -= loop_length_fp;
             }
 
-            const index1: usize = @intCast(self.position_fp >> Oscillator.FRAC_BITS);
+            var index1: usize = @intCast(self.position_fp >> Oscillator.FRAC_BITS);
             var index2 = index1 + 1;
             if (index2 >= self.end_loop) {
                 index2 -= loop_length;
+            }
+
+            if (index1 > data.len - 1) {
+                index1 = data.len - 1;
+            }
+            if (index2 > data.len - 1) {
+                index2 = data.len - 1;
             }
 
             const x1: i64 = @intCast(data[index1]);
