@@ -26,9 +26,9 @@ static FILE stderr_file;
 #define stderr &stderr_file
 
 extern void *agnes_memcpy(void *dst, const void *src, int n);
-extern void agnes_memset(void *dst, uint8_t c, int n);
+extern void *agnes_memset(void *dst, int val, int len);
 extern void agnes_print(char *s);
-extern void agnes_memmove(void *dst, const void *src, int n);
+extern void *agnes_memmove(void *dst, const void *src, int n);
 extern void *agnes_malloc(int n);
 extern void agnes_free(void *p);
 extern void *agnes_realloc(void *p, int n);
@@ -47,14 +47,7 @@ extern int agnes_fprintf(FILE *, const char * format, ...);
 extern void agnes_abort(void);
 extern void agnes_exit(int e);
 extern char *agnes_strncpy(char * dst, const char * src, size_t len);
-
-static void *agnes_calloc(int n, char c) {
-    void *p = agnes_malloc(n);
-    if (p != NULL) {
-        agnes_memset(p, n, c);
-    }
-    return p;
-}
+static void *agnes_calloc(int n, char c);
 
 #define MB_LEN_MAX 16
 

@@ -1,8 +1,38 @@
 const std = @import("std");
 
-const opt = std.builtin.OptimizeMode.ReleaseFast;
+//const opt = std.builtin.OptimizeMode.ReleaseFast;
+const opt = std.builtin.OptimizeMode.Debug;
 
-fn addExample(b: *std.Build, comptime name: []const u8, flags: ?[]const []const u8, sources: ?[]const []const u8, includes: ?[]const []const u8) void {
+pub fn addAssetsOption(b: *std.Build, exe:anytype, target:anytype, optimize:anytype, assetpath:[]const u8) !void {
+    var options = b.addOptions();
+
+    var files = std.ArrayList([]const u8).init(b.allocator);
+    defer files.deinit();
+
+    var buf: [std.fs.MAX_PATH_BYTES]u8 = undefined;
+    const path = try std.fs.cwd().realpath(assetpath, buf[0..]);
+
+    var dir = try std.fs.openDirAbsolute(path, .{.iterate=true});
+    var it = dir.iterate();
+    while (try it.next()) |file| {
+        if (file.kind != .file) {
+            continue;
+        }
+        try files.append(b.dupe(file.name));
+    }
+    options.addOption([]const []const u8, "files", files.items);
+    exe.step.dependOn(&options.step);
+
+    const assets = b.addModule("assets", .{
+        .root_source_file = options.getSource(),
+        .target = target,
+        .optimize = optimize,
+    });
+
+    exe.root_module.addImport("assets", assets);
+}
+
+fn addExample(b: *std.Build, comptime name: []const u8, flags: ?[]const []const u8, sources: ?[]const []const u8, includes: ?[]const []const u8, assets:bool) !void {
     const exe = b.addExecutable(.{
         .name = name,
         .root_source_file = b.path("src/" ++ name ++ "/" ++ name ++ ".zig"),
@@ -29,10 +59,16 @@ fn addExample(b: *std.Build, comptime name: []const u8, flags: ?[]const []const 
 
     b.installFile("src/" ++ name ++ "/" ++ name ++ ".html", name ++ ".html");
 
+    if (assets) {
+        try addAssetsOption(b, exe, b.resolveTargetQuery(std.zig.CrossTarget.parse(
+            .{ .arch_os_abi = "wasm32-freestanding" },
+        ) catch unreachable), opt, "src/" ++ name ++ "/assets");
+    }
+
     b.installArtifact(exe);
 }
 
-pub fn build(b: *std.Build) void {
+pub fn build(b: *std.Build) !void {
     b.installFile("src/index.html", "index.html");
     b.installFile("src/pcm-processor.js", "pcm-processor.js");
     b.installFile("src/wasmpcm.js", "wasmpcm.js");
@@ -40,7 +76,10 @@ pub fn build(b: *std.Build) void {
     b.installFile("src/coi-serviceworker.js", "coi-serviceworker.js");
     b.installFile("src/unmute.js", "unmute.js");
 
-    addExample(b, "terminal", &.{"-Wall", "-fno-sanitize=undefined"}, &.{"src/terminal/libvterm/terminal.c", 
+    try addExample(b, "terminal", &.{"-Wall", "-fno-sanitize=undefined"},&.{
+        "src/terminal/olive.c/olive.c",
+        "src/terminal/stb_truetype.c",
+        "src/terminal/libvterm/terminal.c", 
         "src/terminal/libvterm/printf.c",
         "src/terminal/libvterm/encoding.c",
         "src/terminal/libvterm/mouse.c",
@@ -51,7 +90,7 @@ pub fn build(b: *std.Build) void {
         "src/terminal/libvterm/parser.c",
         "src/terminal/libvterm/screen.c",
         "src/terminal/libvterm/unicode.c"},
-    null);
+    null, true);
 
 //#include "libvterm/encoding.c"
 //#include "libvterm/mouse.c"
