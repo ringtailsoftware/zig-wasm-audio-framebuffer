@@ -22,6 +22,8 @@ const ROWS:usize = 24;
 const COLS:usize = 80;
 const FONTSIZE:usize = 16;
 
+const cast = @embedFile("assets/cast.ansi");
+
 // WebAudio's render quantum size.
 const RENDER_QUANTUM_FRAMES = 128;
 
@@ -482,8 +484,9 @@ export fn init() void {
     gSurface = Game.Surface.init(&gfxFramebuffer, 0, 0, WIDTH, HEIGHT, WIDTH);
     gRenderer = Game.Renderer.init(&gSurface);
 
+    gFontSmall = Game.Font.init("pc.ttf", FONTSIZE) catch |err| {
     //gFontSmall = Game.Font.init("SourceCodePro-Regular.ttf", FONTSIZE) catch |err| {
-    gFontSmall = Game.Font.init("Sweet16.ttf", FONTSIZE) catch |err| {
+//    gFontSmall = Game.Font.init("Sweet16.ttf", FONTSIZE) catch |err| {
         _ = console.print("err {any}\n", .{err}) catch 0;
         return;
     };
@@ -492,7 +495,7 @@ export fn init() void {
     frameCount = 0;
 
     vterm = terminal.vterm_new(ROWS, COLS);
-    terminal.vterm_set_utf8(vterm, 1);
+    //terminal.vterm_set_utf8(vterm, 1);
     terminal.vterm_output_set_callback(vterm, output_callback, null);
     screen = terminal.vterm_obtain_screen(vterm);
     terminal.vterm_screen_set_callbacks(screen, &screen_callbacks, null);
@@ -539,48 +542,33 @@ const GOR = "\x1b[1;32;41m Green On Red \x1b[0m";
 //    const chess = @embedFile("assets/chess.ansi");
 //    _ = terminal.vterm_input_write(vterm, chess, chess.len);
 
-//    const chess = @embedFile("assets/1.ansi");
-//    const res = terminal.vterm_input_write(vterm, chess, chess.len);
+//    _ = terminal.vterm_input_write(vterm, chess, chess.len);
 
 //printf("\033[%d;%dH", (y), (x))
 
-
-//for (int row = 0; row < matrix.getRows(); row++) {
-//                for (int col = 0; col < matrix.getCols(); col++) {
-//                    if (matrix(row, col)) {
-//                        VTermPos pos = { row, col };
-//                        VTermScreenCell cell;
-//                        vterm_screen_get_cell(screen, pos, &cell);
-//
-//    const vt = terminal.tmt_open(2, 10, tmt_cb, null, null);
-//    _ = vt;
-
-//    ag = agnes.agnes_make();
-//    if (agnes.agnes_load_ines_data(ag, @ptrCast(romData), romData.len)) {
-//        _ = console.print("load rom ok\n", .{}) catch 0;
-//    } else {
-//        _ = console.print("load rom failed\n", .{}) catch 0;
-//    }
-//    agnes.agnes_set_input(ag, &ag_input, 0);
 }
 
+var lastCast: u32 = 0;
+var castIndex: usize = 0;
+
 export fn update(deltaMs: u32) void {
-    if (deltaMs > 100) {
-        _ = console.print("Skipping\n", .{}) catch 0;
-        return;
+    _ = deltaMs;
+    if (millis() > lastCast) {
+        lastCast = millis();
     }
 
-//    if (!agnes.agnes_next_frame(ag)) {
-//        _ = console.print("Next frame failed!\n", .{}) catch 0;
+    if (castIndex < cast.len - 100) {
+        const sl = cast[castIndex..castIndex+100];
+        _ = terminal.vterm_input_write(vterm, sl.ptr, sl.len);
+        castIndex += 100;
+    }
+
+
+//    if (deltaMs > 100) {
+//        _ = console.print("Skipping\n", .{}) catch 0;
+//        return;
 //    }
-//
-//    for (0..agnes.AGNES_SCREEN_HEIGHT) |y| {
-//        for (0..agnes.AGNES_SCREEN_WIDTH) |x| {
-//            const c = agnes.agnes_get_screen_pixel(ag, @intCast(x), @intCast(y));
-//            const c_val = @as(u32, @intCast(0xFF)) << 24 | @as(u32, @intCast(c.b)) << 16 | @as(u32, @intCast(c.g)) << 8 | @as(u32, @intCast(c.r));
-//            gfxFramebuffer[@as(usize, @intCast(y)) * WIDTH + @as(usize, @intCast(x))] = c_val;
-//        }
-//    }
+
 }
 
 var lastTime: u32 = 0;
@@ -610,13 +598,12 @@ export fn renderGfx() void {
             if (cell.chars[0] == 0) {
 //                _ = console.print(" ", .{}) catch 0;
             } else {
-//                _ = console.print("{c}", .{@as(u8, @intCast(cell.chars[0]))}) catch 0;
                 var buf:[16]u8 = undefined;
                 buf[0] = @intCast(cell.chars[0]);
                 const sl = buf[0..1];
 
                 var fgcolour:u32 = 0xFFFFFFFF;    // white
-                var bgcolour:u32 = 0xFF000000;    // black
+                var bgcolour:u32 = 0x00000000;    // transparent
                 if (terminal.VTERM_COLOR_IS_INDEXED(&cell.fg)) {
                     terminal.vterm_screen_convert_color_to_rgb(screen, &cell.fg);
                 }
@@ -631,7 +618,10 @@ export fn renderGfx() void {
                 }
 
                 gRenderer.fillRect(Game.Rect.init(@floatFromInt(x*FONTSIZE/2), @floatFromInt(y*FONTSIZE), FONTSIZE/2, FONTSIZE), bgcolour);
-                gRenderer.drawString(&gFontSmall, sl, @intCast(x*FONTSIZE/2), @intCast(y*FONTSIZE+FONTSIZE), fgcolour);
+
+                //gRenderer.drawRect(Game.Rect.init(@floatFromInt(x*FONTSIZE/2), @floatFromInt(y*FONTSIZE), FONTSIZE/2, FONTSIZE), 0xFF404040);
+                const yo:i32 = -4;
+                gRenderer.drawString(&gFontSmall, sl, @intCast(x*FONTSIZE/2), @as(i32, @intCast(y*FONTSIZE+FONTSIZE)) + yo, fgcolour);
             }
         }
         //_ = console.print("\n", .{}) catch 0;
