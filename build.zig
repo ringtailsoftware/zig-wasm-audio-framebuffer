@@ -1,11 +1,9 @@
 const std = @import("std");
 
 var optimize:std.builtin.OptimizeMode = undefined;
+var target:std.Build.ResolvedTarget = undefined;
 
 fn addExample(b: *std.Build, comptime name: []const u8, flags: ?[]const []const u8, sources: ?[]const []const u8, includes: ?[]const []const u8) void {
-    const target = b.resolveTargetQuery(std.zig.CrossTarget.parse(
-            .{ .arch_os_abi = "wasm32-freestanding" },
-        ) catch unreachable);
     const exe = b.addExecutable(.{
         .name = name,
         .root_source_file = b.path("src/" ++ name ++ "/" ++ name ++ ".zig"),
@@ -44,6 +42,9 @@ fn addExample(b: *std.Build, comptime name: []const u8, flags: ?[]const []const 
 
 pub fn build(b: *std.Build) void {
     optimize = b.standardOptimizeOption(.{});
+    target = b.resolveTargetQuery(std.zig.CrossTarget.parse(
+            .{ .arch_os_abi = "wasm32-freestanding" },
+        ) catch unreachable);
 
     b.installFile("src/index.html", "index.html");
     b.installFile("src/pcm-processor.js", "pcm-processor.js");
@@ -103,23 +104,23 @@ pub fn build(b: *std.Build) void {
 
     addExample(b, "olive", &.{"-Wall"}, &.{"src/olive/olive.c/olive.c"}, null);
 
-    const target = b.standardTargetOptions(.{});
+    const hosttarget = b.standardTargetOptions(.{});
     // web server
     const serve_exe = b.addExecutable(.{
         .name = "serve",
         .root_source_file = b.path("httpserver/serve.zig"),
-        .target = target,
+        .target = hosttarget,
         .optimize = optimize,
     });
 
     const mod_server = b.addModule("StaticHttpFileServer", .{
         .root_source_file = b.path("httpserver/root.zig"),
-        .target = target,
+        .target = hosttarget,
         .optimize = optimize,
     });
 
     mod_server.addImport("mime", b.dependency("mime", .{
-        .target = target,
+        .target = hosttarget,
         .optimize = optimize,
     }).module("mime"));
 
