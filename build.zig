@@ -1,6 +1,8 @@
 const std = @import("std");
 
-const opt = std.builtin.OptimizeMode.ReleaseFast;
+var optimize:std.builtin.OptimizeMode = undefined;
+
+// = std.builtin.OptimizeMode.ReleaseFast;
 //const opt = std.builtin.OptimizeMode.Debug;
 
 fn addExample(b: *std.Build, comptime name: []const u8, flags: ?[]const []const u8, sources: ?[]const []const u8, includes: ?[]const []const u8) void {
@@ -11,7 +13,7 @@ fn addExample(b: *std.Build, comptime name: []const u8, flags: ?[]const []const 
         .name = name,
         .root_source_file = b.path("src/" ++ name ++ "/" ++ name ++ ".zig"),
         .target = target,
-        .optimize = opt,
+        .optimize = optimize,
     });
     exe.entry = .disabled;
     exe.rdynamic = true;
@@ -32,7 +34,7 @@ fn addExample(b: *std.Build, comptime name: []const u8, flags: ?[]const []const 
     // add zeptolibc
     const zeptolibc_dep = b.dependency("zeptolibc", .{
         .target = target,
-        .optimize = opt,
+        .optimize = optimize,
     });
     exe.root_module.addImport("zeptolibc", zeptolibc_dep.module("zeptolibc"));
     exe.addIncludePath(zeptolibc_dep.path("src/"));
@@ -103,7 +105,7 @@ pub fn build(b: *std.Build) void {
     addExample(b, "olive", &.{"-Wall"}, &.{"src/olive/olive.c/olive.c"}, null);
 
     const target = b.standardTargetOptions(.{});
-    const optimize = b.standardOptimizeOption(.{});
+    optimize = b.standardOptimizeOption(.{});
     // web server
     const serve_exe = b.addExecutable(.{
         .name = "serve",
