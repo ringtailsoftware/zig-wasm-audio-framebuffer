@@ -8,14 +8,6 @@ Compiling against Zig v0.13.0.
 
 Where C code requires functions from the C library, https://github.com/ringtailsoftware/zeptolibc is used.
 
-## Aims
-
- - Cross-platform (running on multiple browsers and operating systems)
- - Simple understandable code. No hidden libraries, no "emscripten magic"
- - Main loop in browser, wasm responds to function calls to init/update/render
- - One wasm binary per program
- - Use existing C libraries to do fun things
-
 # Demos
 
 Visit https://ringtailsoftware.github.io/zig-wasm-audio-framebuffer
@@ -30,6 +22,14 @@ Visit https://ringtailsoftware.github.io/zig-wasm-audio-framebuffer
  - OliveC, graphics library with sprite blit, circle, rectangle, line, etc.
  - Agnes, NES emulator (no sound)
  - Terminal, libvterm based terminal emulator, playing back an Asciinema .cast file recording
+
+## Aims
+
+ - Cross-platform (running on multiple browsers and operating systems)
+ - Simple understandable code. No hidden libraries, no "emscripten magic"
+ - Main loop in browser, wasm responds to function calls to init/update/render
+ - One wasm binary per program
+ - Use existing C libraries to do fun things
 
 # Build and test
 
