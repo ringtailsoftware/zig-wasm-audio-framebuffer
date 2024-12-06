@@ -19,7 +19,8 @@ const ROWS:usize = 24;
 const COLS:usize = 80;
 const FONTSIZE:usize = 16;
 
-const castData = @embedFile("assets/zoridor.cast");
+const castData = Game.Assets.ASSET_MAP.get("zoridor.cast").?;
+
 var castplayer:CastPlayer = undefined;
 
 // WebAudio's render quantum size.
