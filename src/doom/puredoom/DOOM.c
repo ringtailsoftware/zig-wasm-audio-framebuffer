@@ -28,12 +28,19 @@ static int last_update_time = 0;
 static int button_states[3] = { 0 };
 static char itoa_buf[20];
 
+void *malloc_wrapper(int sz) {
+    return malloc(sz);
+}
+
+void free_wrapper(void *p) {
+    free(p);
+}
 
 char error_buf[260];
 int doom_flags = 0;
 doom_print_fn doom_print = 0;
-doom_malloc_fn doom_malloc = 0;
-doom_free_fn doom_free = 0;
+doom_malloc_fn doom_malloc = malloc_wrapper;
+doom_free_fn doom_free = free_wrapper;
 doom_open_fn doom_open = 0;
 doom_close_fn doom_close = 0;
 doom_read_fn doom_read = 0;
@@ -42,7 +49,7 @@ doom_seek_fn doom_seek = 0;
 doom_tell_fn doom_tell = 0;
 doom_eof_fn doom_eof = 0;
 doom_gettime_fn doom_gettime = 0;
-doom_exit_fn doom_exit = 0;
+doom_exit_fn doom_exit = exit;
 doom_getenv_fn doom_getenv = 0;
 
 

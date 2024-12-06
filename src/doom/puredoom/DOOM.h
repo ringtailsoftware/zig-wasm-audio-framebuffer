@@ -34,10 +34,6 @@
 
 #include "zeptolibc.h"
 
-#define doom_malloc_impl malloc
-#define doom_free_impl free
-#define doom_exit_impl exit
-
 #pragma pack(push, 1)
 
 // Sample rate of sound samples from doom
