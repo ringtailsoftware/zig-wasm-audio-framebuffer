@@ -9,6 +9,7 @@ fn addExample(b: *std.Build, comptime name: []const u8, flags: ?[]const []const 
         .root_source_file = b.path("src/" ++ name ++ "/" ++ name ++ ".zig"),
         .target = target,
         .optimize = optimize,
+        .strip = false,
     });
     exe.entry = .disabled;
     exe.rdynamic = true;
@@ -41,10 +42,11 @@ fn addExample(b: *std.Build, comptime name: []const u8, flags: ?[]const []const 
 }
 
 pub fn build(b: *std.Build) void {
+    const hosttarget = b.standardTargetOptions(.{});
     optimize = b.standardOptimizeOption(.{});
     target = b.resolveTargetQuery(std.zig.CrossTarget.parse(
             .{ .arch_os_abi = "wasm32-freestanding" },
-        ) catch unreachable);
+    ) catch unreachable);
 
     b.installFile("src/index.html", "index.html");
     b.installFile("src/pcm-processor.js", "pcm-processor.js");
@@ -52,6 +54,19 @@ pub fn build(b: *std.Build) void {
     b.installFile("src/ringbuf.js", "ringbuf.js");
     b.installFile("src/coi-serviceworker.js", "coi-serviceworker.js");
     b.installFile("src/unmute.js", "unmute.js");
+
+    addExample(b, "tinygl", &.{ "-Wall", "-fno-sanitize=undefined" }, &.{
+        "src/tinygl/TinyGL/src/api.c",     "src/tinygl/TinyGL/src/specbuf.c",     "src/tinygl/TinyGL/src/zmath.c",
+        "src/tinygl/TinyGL/src/arrays.c",  "src/tinygl/TinyGL/src/image_util.c",  "src/tinygl/TinyGL/src/misc.c",
+        "src/tinygl/TinyGL/src/texture.c", "src/tinygl/TinyGL/src/ztriangle.c",   "src/tinygl/TinyGL/src/clear.c",
+        "src/tinygl/TinyGL/src/init.c",    "src/tinygl/TinyGL/src/msghandling.c", "src/tinygl/TinyGL/src/vertex.c",
+        "src/tinygl/TinyGL/src/clip.c",    "src/tinygl/TinyGL/src/light.c",       "src/tinygl/TinyGL/src/zbuffer.c",
+        "src/tinygl/TinyGL/src/error.c",   "src/tinygl/TinyGL/src/list.c",        "src/tinygl/TinyGL/src/zdither.c",
+        "src/tinygl/TinyGL/src/get.c",     "src/tinygl/TinyGL/src/matrix.c",      "src/tinygl/TinyGL/src/select.c",
+        "src/tinygl/TinyGL/src/zline.c",
+    }, &.{
+        "src/tinygl/TinyGL/include", "src/tinygl/TinyGL/src",
+    });
 
     addExample(b, "agnes", &.{"-Wall", "-fno-sanitize=undefined"}, &.{"src/agnes/agnes.c"}, null);
 
@@ -87,24 +102,10 @@ pub fn build(b: *std.Build) void {
         "src/doom/puredoom/w_wad.c",    "src/doom/puredoom/wi_stuff.c", "src/doom/puredoom/z_zone.c",
     }, null);
 
-    addExample(b, "tinygl", &.{ "-Wall", "-fno-sanitize=undefined" }, &.{
-        "src/tinygl/TinyGL/src/api.c",     "src/tinygl/TinyGL/src/specbuf.c",     "src/tinygl/TinyGL/src/zmath.c",
-        "src/tinygl/TinyGL/src/arrays.c",  "src/tinygl/TinyGL/src/image_util.c",  "src/tinygl/TinyGL/src/misc.c",
-        "src/tinygl/TinyGL/src/texture.c", "src/tinygl/TinyGL/src/ztriangle.c",   "src/tinygl/TinyGL/src/clear.c",
-        "src/tinygl/TinyGL/src/init.c",    "src/tinygl/TinyGL/src/msghandling.c", "src/tinygl/TinyGL/src/vertex.c",
-        "src/tinygl/TinyGL/src/clip.c",    "src/tinygl/TinyGL/src/light.c",       "src/tinygl/TinyGL/src/zbuffer.c",
-        "src/tinygl/TinyGL/src/error.c",   "src/tinygl/TinyGL/src/list.c",        "src/tinygl/TinyGL/src/zdither.c",
-        "src/tinygl/TinyGL/src/get.c",     "src/tinygl/TinyGL/src/matrix.c",      "src/tinygl/TinyGL/src/select.c",
-        "src/tinygl/TinyGL/src/zline.c",
-    }, &.{
-        "src/tinygl/TinyGL/include", "src/tinygl/TinyGL/src",
-    });
-
     addExample(b, "mandelbrot", null, null, null);
 
     addExample(b, "olive", &.{"-Wall"}, &.{"src/olive/olive.c/olive.c"}, null);
 
-    const hosttarget = b.standardTargetOptions(.{});
     // web server
     const serve_exe = b.addExecutable(.{
         .name = "serve",
