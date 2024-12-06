@@ -2,6 +2,7 @@ const std = @import("std");
 const console = @import("console.zig").getWriter().writer();
 const ziggysynth = @import("ziggysynth.zig");
 
+const zeptolibc = @import("zeptolibc");
 const pd = @cImport({
     @cInclude("puredoom/PureDOOM.h");
 });
@@ -20,7 +21,7 @@ var music_right: [RENDER_QUANTUM_FRAMES]f32 = undefined;
 var mix_left: [RENDER_QUANTUM_FRAMES]f32 = undefined;
 var mix_right: [RENDER_QUANTUM_FRAMES]f32 = undefined;
 var music_leftright: [RENDER_QUANTUM_FRAMES * 2]f32 = undefined;
-var sampleRate: f32 = 44100;
+var sampleRate: f32 = 22050;
 var synthesizer: Synthesizer = undefined;
 
 const WIDTH = 320;
@@ -56,11 +57,14 @@ pub const std_options: std.Options = .{
 };
 
 pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {
-    _ = ret_addr;
-    _ = trace;
     @setCold(true);
-    _ = console.print("PANIC: {s}", .{msg}) catch 0;
+    _ = console.print("PANIC: {s} ret_addr={any}\n", .{msg, ret_addr}) catch 0;
+    _ = console.print("{any}\n", .{trace}) catch 0;
     while (true) {}
+}
+
+fn consoleWriteFn(data:[]const u8) void {
+    _ = console.print("{s}", .{data}) catch 0;
 }
 
 extern fn getTimeUs() u32;
@@ -73,22 +77,6 @@ export fn doom_print_impl(msg: [*:0]const u8) callconv(.C) void {
 export fn doom_gettime_impl(sec: *c_int, usec: *c_int) callconv(.C) void {
     sec.* = @intCast(millis() / 1000);
     usec.* = @intCast(@mod(millis() * 1000, 1000000));
-}
-
-export fn doom_malloc_impl(size: c_int) callconv(.C) ?[*]u8 {
-    const mem = allocator.alloc(u8, @intCast(size + @sizeOf(usize))) catch {
-        _ = console.print("ALLOCFAIL", .{}) catch 0;
-        return null;
-    };
-    const sz: *usize = @ptrCast(@alignCast(mem.ptr));
-    sz.* = @intCast(size);
-    return mem.ptr + @sizeOf(usize);
-}
-
-export fn doom_free_impl(ptr: [*]u8) callconv(.C) void {
-    const sz: *const usize = @ptrCast(@alignCast(ptr - @sizeOf(usize)));
-    const p = ptr - @sizeOf(usize);
-    allocator.free(p[0 .. sz.* + @sizeOf(usize)]);
 }
 
 export fn doom_open_impl(filename: [*:0]const u8, mode: [*]const u8) callconv(.C) ?*c_int {
@@ -152,10 +140,6 @@ export fn doom_eof_impl(handle: *c_int) callconv(.C) c_int {
     } else {
         return 0;
     }
-}
-export fn doom_exit_impl(code: c_int) callconv(.C) void {
-    _ = console.print("doom_exit_impl {d}\n", .{code}) catch 0;
-    while (true) {} // FIXME
 }
 
 pub fn millis() u32 {
@@ -224,6 +208,9 @@ export fn renderSoundQuantum() void {
 export fn init() void {
     startTime = getTimeUs();
     frameCount = 0;
+
+    // init zepto with a memory allocator and console writer
+    zeptolibc.init(allocator, consoleWriteFn);
 
     pd.doom_set_resolution(WIDTH, HEIGHT);
     pd.pd_init();

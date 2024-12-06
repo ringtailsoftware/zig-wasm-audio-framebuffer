@@ -32,6 +32,8 @@
 #ifndef __DOOM_H__
 #define __DOOM_H__
 
+#include "zeptolibc.h"
+
 #pragma pack(push, 1)
 
 // Sample rate of sound samples from doom

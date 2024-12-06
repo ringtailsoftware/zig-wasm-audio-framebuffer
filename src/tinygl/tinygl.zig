@@ -1,6 +1,6 @@
 const std = @import("std");
 const console = @import("console.zig").getWriter().writer();
-
+const zeptolibc = @import("zeptolibc");
 const tgl = @cImport({
     @cInclude("GL/gl.h");
     @cInclude("zgl.h");
@@ -235,53 +235,6 @@ pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize)
 
 extern fn getTimeUs() u32;
 
-// implement a backend for tgl
-export fn gl_malloc(size: c_int) callconv(.C) ?[*]u8 {
-    const mem = allocator.alloc(u8, @intCast(size + @sizeOf(usize))) catch {
-        _ = console.print("ALLOCFAIL", .{}) catch 0;
-        return null;
-    };
-    const sz: *usize = @ptrCast(@alignCast(mem.ptr));
-    sz.* = @intCast(size);
-    return mem.ptr + @sizeOf(usize);
-}
-
-export fn gl_zalloc(size: c_int) callconv(.C) ?[*]u8 {
-    const mem: ?[*]u8 = gl_malloc(size);
-    if (mem != null) {
-        const mems = mem.?[0..@intCast(size)];
-        @memset(mems, 0x00);
-    }
-    return mem;
-}
-
-export fn gl_free(ptr: [*]u8) callconv(.C) void {
-    const sz: *const usize = @ptrCast(@alignCast(ptr - @sizeOf(usize)));
-    const p = ptr - @sizeOf(usize);
-    allocator.free(p[0 .. sz.* + @sizeOf(usize)]);
-}
-
-export fn zsin(x: f64) callconv(.C) f64 {
-    return @sin(x);
-}
-export fn zcos(x: f64) callconv(.C) f64 {
-    return @cos(x);
-}
-export fn zsqrt(x: f64) callconv(.C) f64 {
-    return std.math.sqrt(x);
-}
-export fn zpow(x: f64, y: f64) callconv(.C) f64 {
-    return std.math.pow(f64, x, y);
-}
-export fn zfabs(x: f64) callconv(.C) f64 {
-    return @abs(x);
-}
-
-export fn gl_memcpy(dst: [*]u8, src: [*]u8, size: c_int) callconv(.C) [*]u8 {
-    @memcpy(dst[0..@intCast(size)], src[0..@intCast(size)]);
-    return dst;
-}
-
 pub fn millis() u32 {
     return (getTimeUs() - startTime) / 1000;
 }
@@ -319,14 +272,21 @@ export fn getRightBufPtr() [*]u8 {
 
 export fn renderSoundQuantum() void {}
 
+fn consoleWriteFn(data:[]const u8) void {
+    _ = console.print("{s}", .{data}) catch 0;
+}
+
 export fn init() void {
     startTime = getTimeUs();
     frameCount = 0;
 
+    // init zepto with a memory allocator and console writer
+    zeptolibc.init(allocator, consoleWriteFn);
+
     const zb: *tgl.ZBuffer = tgl.ZB_open(WIDTH, HEIGHT, tgl.ZB_MODE_RGBA, 0, 0, 0, &gfxFramebuffer);
     tgl.glInit(zb);
 
-    var glCtx: *tgl.GLContext = tgl.gl_get_context();
+    const glCtx: *tgl.GLContext = tgl.gl_get_context();
     glCtx.zb = zb;
 
     reshape(WIDTH, HEIGHT);

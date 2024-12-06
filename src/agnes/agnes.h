@@ -42,33 +42,7 @@ extern "C"
 #include <stddef.h>
 #include <stdint.h>
 
-extern void *agnes_memcpy(void *dst, const void *src, int n);
-extern void agnes_memset(void *dst, uint8_t c, int n);
-extern void agnes_print(char *s);
-extern void agnes_memmove(void *dst, const void *src, int n);
-extern void *agnes_malloc(int n);
-extern void agnes_free(void *p);
-#define memcpy agnes_memcpy
-#define memset agnes_memset
-#define memmove agnes_memmove
-#define malloc agnes_malloc
-#define free agnes_free
-
-static int strncmp(const char *s1, const char *s2, int n) {
-    unsigned char u1, u2;
-
-    while (n-- > 0) {
-        u1 = (unsigned char) *s1++;
-        u2 = (unsigned char) *s2++;
-        if (u1 != u2) {
-            return u1 - u2;
-        }
-        if (u1 == '\0') {
-            return 0;
-        }
-    }
-    return 0;
-}
+#include "zeptolibc.h"
 
 enum {
     AGNES_SCREEN_WIDTH = 256,

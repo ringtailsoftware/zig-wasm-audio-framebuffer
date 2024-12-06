@@ -6,11 +6,14 @@ Straightforward examples of integrating Zig and Wasm for audio and graphics on t
 
 Compiling against Zig v0.13.0.
 
+Where C code requires functions from the C library, https://github.com/ringtailsoftware/zeptolibc is used.
+
 ## Aims
 
  - Cross-platform (running on multiple browsers and operating systems)
  - Simple understandable code. No hidden libraries, no "emscripten magic"
- - Single thread of execution in Zig, one wasm binary per program
+ - Main loop in browser, wasm responds to function calls to init/update/render
+ - One wasm binary per program
  - Use existing C libraries to do fun things
 
 # Demos

@@ -27,6 +27,10 @@
             .url = "https://github.com/andrewrk/mime/archive/refs/tags/2.0.1.tar.gz",
             .hash = "12209083b0c43d0f68a26a48a7b26ad9f93b22c9cff710c78ddfebb47b89cfb9c7a4",
         },
+        .zeptolibc = .{
+            .url = "git+https://github.com/ringtailsoftware/zeptolibc.git#c718601f80e6a3de5280b88f348ba29a8f2711ab",
+            .hash = "122056709e3458c2d8a2af19d7d622e07ecda96c46d70a911145963362e048ee5ff7",
+        },
     },
     .paths = .{
         "build.zig",

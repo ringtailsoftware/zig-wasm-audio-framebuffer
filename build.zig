@@ -1,9 +1,9 @@
 const std = @import("std");
 
-//const opt = std.builtin.OptimizeMode.ReleaseFast;
-const opt = std.builtin.OptimizeMode.Debug;
+var optimize:std.builtin.OptimizeMode = undefined;
+var target:std.Build.ResolvedTarget = undefined;
 
-pub fn addAssetsOption(b: *std.Build, exe:anytype, target:anytype, optimize:anytype, assetpath:[]const u8) !void {
+pub fn addAssetsOption(b: *std.Build, exe:anytype, assetpath:[]const u8) !void {
     var options = b.addOptions();
 
     var files = std.ArrayList([]const u8).init(b.allocator);
@@ -32,14 +32,13 @@ pub fn addAssetsOption(b: *std.Build, exe:anytype, target:anytype, optimize:anyt
     exe.root_module.addImport("assets", assets);
 }
 
-fn addExample(b: *std.Build, comptime name: []const u8, flags: ?[]const []const u8, sources: ?[]const []const u8, includes: ?[]const []const u8, assets:bool) !void {
+fn addExample(b: *std.Build, comptime name: []const u8, flags: ?[]const []const u8, sources: ?[]const []const u8, includes: ?[]const []const u8) !void {
     const exe = b.addExecutable(.{
         .name = name,
         .root_source_file = b.path("src/" ++ name ++ "/" ++ name ++ ".zig"),
-        .target = b.resolveTargetQuery(std.zig.CrossTarget.parse(
-            .{ .arch_os_abi = "wasm32-freestanding" },
-        ) catch unreachable),
-        .optimize = opt,
+        .target = target,
+        .optimize = optimize,
+        .strip = false,
     });
     exe.entry = .disabled;
     exe.rdynamic = true;
@@ -57,18 +56,37 @@ fn addExample(b: *std.Build, comptime name: []const u8, flags: ?[]const []const 
         });
     }
 
+    // add zeptolibc
+    const zeptolibc_dep = b.dependency("zeptolibc", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    exe.root_module.addImport("zeptolibc", zeptolibc_dep.module("zeptolibc"));
+    exe.addIncludePath(zeptolibc_dep.path("src/"));
+    exe.addIncludePath(b.path("src/"));
+
     b.installFile("src/" ++ name ++ "/" ++ name ++ ".html", name ++ ".html");
 
-    if (assets) {
-        try addAssetsOption(b, exe, b.resolveTargetQuery(std.zig.CrossTarget.parse(
-            .{ .arch_os_abi = "wasm32-freestanding" },
-        ) catch unreachable), opt, "src/" ++ name ++ "/assets");
+    // if assets dir exists in project, add @embedFile everything in it
+    if (std.fs.cwd().statFile("src/" ++ name ++ "/assets")) |stat| {
+        switch(stat.kind) {
+            .directory => try addAssetsOption(b, exe, "src/" ++ name ++ "/assets"),
+            else => return error.AssetsDirectoryIsAFile,
+        }
+    } else |err| switch(err) {
+        else => {},
     }
 
     b.installArtifact(exe);
 }
 
 pub fn build(b: *std.Build) !void {
+    const hosttarget = b.standardTargetOptions(.{});
+    optimize = b.standardOptimizeOption(.{});
+    target = b.resolveTargetQuery(std.zig.CrossTarget.parse(
+            .{ .arch_os_abi = "wasm32-freestanding" },
+    ) catch unreachable);
+
     b.installFile("src/index.html", "index.html");
     b.installFile("src/pcm-processor.js", "pcm-processor.js");
     b.installFile("src/wasmpcm.js", "wasmpcm.js");
@@ -80,7 +98,6 @@ pub fn build(b: *std.Build) !void {
         "src/terminal/olive.c/olive.c",
         "src/terminal/stb_truetype.c",
         "src/terminal/libvterm/terminal.c", 
-        "src/terminal/libvterm/printf.c",
         "src/terminal/libvterm/encoding.c",
         "src/terminal/libvterm/mouse.c",
         "src/terminal/libvterm/pen.c",
@@ -90,87 +107,76 @@ pub fn build(b: *std.Build) !void {
         "src/terminal/libvterm/parser.c",
         "src/terminal/libvterm/screen.c",
         "src/terminal/libvterm/unicode.c"},
-    null, true);
+    null);
 
-//#include "libvterm/encoding.c"
-//#include "libvterm/mouse.c"
-//#include "libvterm/pen.c"
-//#include "libvterm/state.c"
-//#include "libvterm/vterm.c"
-//#include "libvterm/keyboard.c"
-//#include "libvterm/parser.c"
-//#include "libvterm/screen.c"
-//#include "libvterm/unicode.c"
+    try addExample(b, "agnes", &.{"-Wall", "-fno-sanitize=undefined"}, &.{"src/agnes/agnes.c"}, null);
 
-//    addExample(b, "agnes", &.{"-Wall", "-fno-sanitize=undefined"}, &.{"src/agnes/agnes.c"}, null);
-//
-//    addExample(b, "sinetone", null, null, null);
-//
-//    addExample(b, "synth", null, null, null);
-//
-//    addExample(b, "mod", &.{"-Wall"}, &.{"src/mod/pocketmod.c"}, null);
-//
-//    addExample(b, "bat", &.{"-Wall"}, &.{"src/mod/pocketmod.c"}, null);
-//
-//    addExample(b, "doom", &.{ "-Wall", "-fno-sanitize=undefined" }, &.{
-//        "src/doom/puredoom/DOOM.c",     "src/doom/puredoom/PureDOOM.c", "src/doom/puredoom/am_map.c",
-//        "src/doom/puredoom/d_items.c",  "src/doom/puredoom/d_main.c",   "src/doom/puredoom/d_net.c",
-//        "src/doom/puredoom/doomdef.c",  "src/doom/puredoom/doomstat.c", "src/doom/puredoom/dstrings.c",
-//        "src/doom/puredoom/f_finale.c", "src/doom/puredoom/f_wipe.c",   "src/doom/puredoom/g_game.c",
-//        "src/doom/puredoom/hu_lib.c",   "src/doom/puredoom/hu_stuff.c", "src/doom/puredoom/i_net.c",
-//        "src/doom/puredoom/i_sound.c",  "src/doom/puredoom/i_system.c", "src/doom/puredoom/i_video.c",
-//        "src/doom/puredoom/info.c",     "src/doom/puredoom/m_argv.c",   "src/doom/puredoom/m_bbox.c",
-//        "src/doom/puredoom/m_cheat.c",  "src/doom/puredoom/m_fixed.c",  "src/doom/puredoom/m_menu.c",
-//        "src/doom/puredoom/m_misc.c",   "src/doom/puredoom/m_random.c", "src/doom/puredoom/m_swap.c",
-//        "src/doom/puredoom/p_ceilng.c", "src/doom/puredoom/p_doors.c",  "src/doom/puredoom/p_enemy.c",
-//        "src/doom/puredoom/p_floor.c",  "src/doom/puredoom/p_inter.c",  "src/doom/puredoom/p_lights.c",
-//        "src/doom/puredoom/p_map.c",    "src/doom/puredoom/p_maputl.c", "src/doom/puredoom/p_mobj.c",
-//        "src/doom/puredoom/p_plats.c",  "src/doom/puredoom/p_pspr.c",   "src/doom/puredoom/p_saveg.c",
-//        "src/doom/puredoom/p_setup.c",  "src/doom/puredoom/p_sight.c",  "src/doom/puredoom/p_spec.c",
-//        "src/doom/puredoom/p_switch.c", "src/doom/puredoom/p_telept.c", "src/doom/puredoom/p_tick.c",
-//        "src/doom/puredoom/p_user.c",   "src/doom/puredoom/r_bsp.c",    "src/doom/puredoom/r_data.c",
-//        "src/doom/puredoom/r_draw.c",   "src/doom/puredoom/r_main.c",   "src/doom/puredoom/r_plane.c",
-//        "src/doom/puredoom/r_segs.c",   "src/doom/puredoom/r_sky.c",    "src/doom/puredoom/r_things.c",
-//        "src/doom/puredoom/s_sound.c",  "src/doom/puredoom/sounds.c",   "src/doom/puredoom/st_lib.c",
-//        "src/doom/puredoom/st_stuff.c", "src/doom/puredoom/tables.c",   "src/doom/puredoom/v_video.c",
-//        "src/doom/puredoom/w_wad.c",    "src/doom/puredoom/wi_stuff.c", "src/doom/puredoom/z_zone.c",
-//    }, null);
-//
-//    addExample(b, "tinygl", &.{ "-Wall", "-fno-sanitize=undefined" }, &.{
-//        "src/tinygl/TinyGL/src/api.c",     "src/tinygl/TinyGL/src/specbuf.c",     "src/tinygl/TinyGL/src/zmath.c",
-//        "src/tinygl/TinyGL/src/arrays.c",  "src/tinygl/TinyGL/src/image_util.c",  "src/tinygl/TinyGL/src/misc.c",
-//        "src/tinygl/TinyGL/src/texture.c", "src/tinygl/TinyGL/src/ztriangle.c",   "src/tinygl/TinyGL/src/clear.c",
-//        "src/tinygl/TinyGL/src/init.c",    "src/tinygl/TinyGL/src/msghandling.c", "src/tinygl/TinyGL/src/vertex.c",
-//        "src/tinygl/TinyGL/src/clip.c",    "src/tinygl/TinyGL/src/light.c",       "src/tinygl/TinyGL/src/zbuffer.c",
-//        "src/tinygl/TinyGL/src/error.c",   "src/tinygl/TinyGL/src/list.c",        "src/tinygl/TinyGL/src/zdither.c",
-//        "src/tinygl/TinyGL/src/get.c",     "src/tinygl/TinyGL/src/matrix.c",      "src/tinygl/TinyGL/src/select.c",
-//        "src/tinygl/TinyGL/src/zline.c",
-//    }, &.{
-//        "src/tinygl/TinyGL/include", "src/tinygl/TinyGL/src",
-//    });
-//
-//    addExample(b, "mandelbrot", null, null, null);
-//
-//    addExample(b, "olive", &.{"-Wall"}, &.{"src/olive/olive.c/olive.c"}, null);
+    try addExample(b, "sinetone", null, null, null);
 
-    const target = b.standardTargetOptions(.{});
-    const optimize = b.standardOptimizeOption(.{});
+    try addExample(b, "synth", null, null, null);
+
+    try addExample(b, "mod", &.{"-Wall"}, &.{"src/mod/pocketmod.c"}, null);
+
+    try addExample(b, "bat", &.{"-Wall"}, &.{"src/mod/pocketmod.c"}, null);
+
+    try addExample(b, "doom", &.{ "-Wall", "-fno-sanitize=undefined" }, &.{
+        "src/doom/puredoom/DOOM.c",     "src/doom/puredoom/PureDOOM.c", "src/doom/puredoom/am_map.c",
+        "src/doom/puredoom/d_items.c",  "src/doom/puredoom/d_main.c",   "src/doom/puredoom/d_net.c",
+        "src/doom/puredoom/doomdef.c",  "src/doom/puredoom/doomstat.c", "src/doom/puredoom/dstrings.c",
+        "src/doom/puredoom/f_finale.c", "src/doom/puredoom/f_wipe.c",   "src/doom/puredoom/g_game.c",
+        "src/doom/puredoom/hu_lib.c",   "src/doom/puredoom/hu_stuff.c", "src/doom/puredoom/i_net.c",
+        "src/doom/puredoom/i_sound.c",  "src/doom/puredoom/i_system.c", "src/doom/puredoom/i_video.c",
+        "src/doom/puredoom/info.c",     "src/doom/puredoom/m_argv.c",   "src/doom/puredoom/m_bbox.c",
+        "src/doom/puredoom/m_cheat.c",  "src/doom/puredoom/m_fixed.c",  "src/doom/puredoom/m_menu.c",
+        "src/doom/puredoom/m_misc.c",   "src/doom/puredoom/m_random.c", "src/doom/puredoom/m_swap.c",
+        "src/doom/puredoom/p_ceilng.c", "src/doom/puredoom/p_doors.c",  "src/doom/puredoom/p_enemy.c",
+        "src/doom/puredoom/p_floor.c",  "src/doom/puredoom/p_inter.c",  "src/doom/puredoom/p_lights.c",
+        "src/doom/puredoom/p_map.c",    "src/doom/puredoom/p_maputl.c", "src/doom/puredoom/p_mobj.c",
+        "src/doom/puredoom/p_plats.c",  "src/doom/puredoom/p_pspr.c",   "src/doom/puredoom/p_saveg.c",
+        "src/doom/puredoom/p_setup.c",  "src/doom/puredoom/p_sight.c",  "src/doom/puredoom/p_spec.c",
+        "src/doom/puredoom/p_switch.c", "src/doom/puredoom/p_telept.c", "src/doom/puredoom/p_tick.c",
+        "src/doom/puredoom/p_user.c",   "src/doom/puredoom/r_bsp.c",    "src/doom/puredoom/r_data.c",
+        "src/doom/puredoom/r_draw.c",   "src/doom/puredoom/r_main.c",   "src/doom/puredoom/r_plane.c",
+        "src/doom/puredoom/r_segs.c",   "src/doom/puredoom/r_sky.c",    "src/doom/puredoom/r_things.c",
+        "src/doom/puredoom/s_sound.c",  "src/doom/puredoom/sounds.c",   "src/doom/puredoom/st_lib.c",
+        "src/doom/puredoom/st_stuff.c", "src/doom/puredoom/tables.c",   "src/doom/puredoom/v_video.c",
+        "src/doom/puredoom/w_wad.c",    "src/doom/puredoom/wi_stuff.c", "src/doom/puredoom/z_zone.c",
+    }, null);
+
+
+    try addExample(b, "tinygl", &.{ "-Wall", "-fno-sanitize=undefined" }, &.{
+        "src/tinygl/TinyGL/src/api.c",     "src/tinygl/TinyGL/src/specbuf.c",     "src/tinygl/TinyGL/src/zmath.c",
+        "src/tinygl/TinyGL/src/arrays.c",  "src/tinygl/TinyGL/src/image_util.c",  "src/tinygl/TinyGL/src/misc.c",
+        "src/tinygl/TinyGL/src/texture.c", "src/tinygl/TinyGL/src/ztriangle.c",   "src/tinygl/TinyGL/src/clear.c",
+        "src/tinygl/TinyGL/src/init.c",    "src/tinygl/TinyGL/src/msghandling.c", "src/tinygl/TinyGL/src/vertex.c",
+        "src/tinygl/TinyGL/src/clip.c",    "src/tinygl/TinyGL/src/light.c",       "src/tinygl/TinyGL/src/zbuffer.c",
+        "src/tinygl/TinyGL/src/error.c",   "src/tinygl/TinyGL/src/list.c",        "src/tinygl/TinyGL/src/zdither.c",
+        "src/tinygl/TinyGL/src/get.c",     "src/tinygl/TinyGL/src/matrix.c",      "src/tinygl/TinyGL/src/select.c",
+        "src/tinygl/TinyGL/src/zline.c",
+    }, &.{
+        "src/tinygl/TinyGL/include", "src/tinygl/TinyGL/src",
+    });
+
+    try addExample(b, "mandelbrot", null, null, null);
+
+    try addExample(b, "olive", &.{"-Wall"}, &.{"src/olive/olive.c/olive.c"}, null);
+
     // web server
     const serve_exe = b.addExecutable(.{
         .name = "serve",
         .root_source_file = b.path("httpserver/serve.zig"),
-        .target = target,
+        .target = hosttarget,
         .optimize = optimize,
     });
 
     const mod_server = b.addModule("StaticHttpFileServer", .{
         .root_source_file = b.path("httpserver/root.zig"),
-        .target = target,
+        .target = hosttarget,
         .optimize = optimize,
     });
 
     mod_server.addImport("mime", b.dependency("mime", .{
-        .target = target,
+        .target = hosttarget,
         .optimize = optimize,
     }).module("mime"));
 
