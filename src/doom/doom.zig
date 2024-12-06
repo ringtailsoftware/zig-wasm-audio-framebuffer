@@ -41,6 +41,10 @@ var wad_stream_offset: usize = 0;
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const allocator = gpa.allocator();
 
+fn consoleWriteFn(data:[]const u8) void {
+    _ = console.print("{s}", .{data}) catch 0;
+}
+
 pub fn logFn(
     comptime message_level: std.log.Level,
     comptime scope: @TypeOf(.enum_literal),
@@ -61,10 +65,6 @@ pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize)
     _ = console.print("PANIC: {s} ret_addr={any}\n", .{msg, ret_addr}) catch 0;
     _ = console.print("{any}\n", .{trace}) catch 0;
     while (true) {}
-}
-
-fn consoleWriteFn(data:[]const u8) void {
-    _ = console.print("{s}", .{data}) catch 0;
 }
 
 extern fn getTimeUs() u32;

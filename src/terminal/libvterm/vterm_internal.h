@@ -1,6 +1,6 @@
 #ifndef __VTERM_INTERNAL_H__
 #define __VTERM_INTERNAL_H__
-#include "terminal.h"
+#include "zeptolibc.h"
 #include "vterm.h"
 
 #include <stdarg.h>

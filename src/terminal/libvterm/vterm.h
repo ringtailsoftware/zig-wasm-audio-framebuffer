@@ -9,6 +9,8 @@ extern "C" {
 #include <stdlib.h>
 #include <stdbool.h>
 
+#include "zeptolibc.h"
+
 #include "vterm_keycodes.h"
 
 #define VTERM_VERSION_MAJOR 0

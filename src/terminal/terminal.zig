@@ -1,9 +1,9 @@
 const std = @import("std");
 const console = @import("console.zig").getWriter().writer();
+const zeptolibc = @import("zeptolibc");
 const terminal = @cImport({
     @cInclude("libvterm/terminal.h");
 });
-pub usingnamespace @import("c.zig");
 
 
 var vterm:?*terminal.VTerm = null;
@@ -52,6 +52,12 @@ var startTime: u32 = 0;
 const COLOUR_BLACK = 0xFF000000;
 const COLOUR_WHITE = 0xFFFFFFFF;
 
+var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+const allocator = gpa.allocator();
+
+fn consoleWriteFn(data:[]const u8) void {
+    _ = console.print("{s}", .{data}) catch 0;
+}
 
 pub fn logFn(
     comptime message_level: std.log.Level,
@@ -76,13 +82,13 @@ pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize)
     while (true) {}
 }
 
-export fn _fwrite_buf(ptr: [*]const u8, size: usize, stream: *terminal.FILE) callconv(.C) usize {
-    _ = console.print("_fwrite_buf FIXME", .{}) catch 0;
-    _ = ptr;
-    _ = stream;
-    return size;
-}
-
+//export fn _fwrite_buf(ptr: [*]const u8, size: usize, stream: *terminal.FILE) callconv(.C) usize {
+//    _ = console.print("_fwrite_buf FIXME", .{}) catch 0;
+//    _ = ptr;
+//    _ = stream;
+//    return size;
+//}
+//
 
 extern fn getTimeUs() u32;
 pub fn millis() u32 {
@@ -221,6 +227,8 @@ const screen_callbacks:terminal.VTermScreenCallbacks = .{
 };
 
 export fn init() void {
+    // init zepto with a memory allocator and console writer
+    zeptolibc.init(allocator, consoleWriteFn);
 
     gSurface = Game.Surface.init(&gfxFramebuffer, 0, 0, WIDTH, HEIGHT, WIDTH);
     gRenderer = Game.Renderer.init(&gSurface);
