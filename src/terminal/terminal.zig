@@ -6,12 +6,16 @@ const terminal = @cImport({
 });
 const CastPlayer = @import("castplay.zig").CastPlayer;
 
+const mibu = @import("mibu");
+const zigtris = @import("zigtris/main.zig");
+var nextEvent:mibu.events.Event = .none;
 
 var vterm:?*terminal.VTerm = null;
 var screen:?*terminal.VTermScreen = null;
 
 const Game = @import("game.zig").Game;
 var gFontSmall: Game.Font = undefined;
+var gFontSmallBold: Game.Font = undefined;
 var gSurface: Game.Surface = undefined;
 var gRenderer: Game.Renderer = undefined;
 
@@ -77,8 +81,20 @@ pub fn millis() u32 {
     return (getTimeUs() - startTime) / 1000;
 }
 
-export fn keyevent(keycode: u32, down: bool) void {
-    _ = console.print("keycode {d} {any}\n", .{keycode, down}) catch 0;
+export fn keyevent(keycode: u32, down: bool, isRepeat:bool) void {
+    _ = isRepeat;
+//    _ = console.print("keycode {d} {any} {any}\n", .{keycode, down, isRepeat}) catch 0;
+
+    if (down) {
+        switch(keycode) {
+            32 => nextEvent = mibu.events.Event{.key = .{.char = ' '}},
+            37 => nextEvent = mibu.events.Event{.key = .left},
+            39 => nextEvent = mibu.events.Event{.key = .right},
+            38 => nextEvent = mibu.events.Event{.key = .up},
+            40 => nextEvent = mibu.events.Event{.key = .down},
+            else => {},
+        }
+    }
 }
 
 export fn getGfxBufPtr() [*]u8 {
@@ -207,6 +223,10 @@ export fn init() void {
         _ = console.print("err {any}\n", .{err}) catch 0;
         return;
     };
+    gFontSmallBold = Game.Font.init("pc-bold.ttf", FONTSIZE) catch |err| {
+        _ = console.print("err {any}\n", .{err}) catch 0;
+        return;
+    };
 
     startTime = getTimeUs();
 
@@ -215,19 +235,46 @@ export fn init() void {
     screen = terminal.vterm_obtain_screen(vterm);
     terminal.vterm_screen_set_callbacks(screen, &screen_callbacks, null);
     terminal.vterm_screen_reset(screen, 1);
+
+    _ = mibu.cursor.goTo(vtermwriter, 10, 10) catch 0;
+    try mibu.color.fg256(vtermwriter, .yellow);
+    try mibu.color.bg256(vtermwriter, .blue);
+    _ = vtermwriter.print("Hello 10,10", .{}) catch 0;
+    _ = mibu.cursor.goTo(vtermwriter, 10, 12) catch 0;
+    try mibu.color.fg256(vtermwriter, .white);
+    try mibu.color.bg256(vtermwriter, .black);
+    try mibu.style.bold(vtermwriter);
+    _ = vtermwriter.print("Bold 10,12", .{}) catch 0;
+
+    try zigtris.gamesetup(vtermwriter, millis());
+
 }
+
+var lastUpdate:u32 = 0;
 
 export fn update(deltaMs: u32) void {
     _ = deltaMs;
 
-    while (castplayer.getData(millis())) |s| {
-        _ = terminal.vterm_input_write(vterm, s.ptr, s.len);
+    if (millis() > lastUpdate + 100 or nextEvent != .none) {
+        const gameRunning = zigtris.gameloop(vtermwriter, millis(), nextEvent) catch false;
+        nextEvent = .none;
+        if (!gameRunning) {
+            _ = console.print("new game!\n", .{}) catch 0;
+
+            _ = zigtris.gamesetup(vtermwriter, millis()) catch 0;
+        }
+
+        lastUpdate = millis();
     }
+
+
+//    while (castplayer.getData(millis())) |s| {
+//        _ = terminal.vterm_input_write(vterm, s.ptr, s.len);
+//    }
 }
 
 export fn renderGfx() void {
     // background
-
     gRenderer.fill(0xFF000000); // black background
 
     for (0..ROWS) |y| {
@@ -255,12 +302,47 @@ export fn renderGfx() void {
                     bgcolour = @as(u32, @intCast(0xFF)) << 24 | @as(u32, @intCast(cell.bg.rgb.blue)) << 16 | @as(u32, @intCast(cell.bg.rgb.green)) << 8 | @as(u32, @intCast(cell.bg.rgb.red));
                 }
 
+                var font:*Game.Font = &gFontSmall;
+                if (cell.attrs.bold > 0) {
+                    font = &gFontSmallBold;
+                }
+
                 gRenderer.fillRect(Game.Rect.init(@floatFromInt(x*FONTSIZE/2), @floatFromInt(y*FONTSIZE), FONTSIZE/2, FONTSIZE), bgcolour);
 
                 //gRenderer.drawRect(Game.Rect.init(@floatFromInt(x*FONTSIZE/2), @floatFromInt(y*FONTSIZE), FONTSIZE/2, FONTSIZE), 0xFF404040);
                 const yo:i32 = -4;
-                gRenderer.drawString(&gFontSmall, sl, @intCast(x*FONTSIZE/2), @as(i32, @intCast(y*FONTSIZE+FONTSIZE)) + yo, fgcolour);
+                gRenderer.drawString(font, sl, @intCast(x*FONTSIZE/2), @as(i32, @intCast(y*FONTSIZE+FONTSIZE)) + yo, fgcolour);
             }
         }
     }
 }
+
+var vtw = VTermWriter{};
+var vtermwriter = vtw.writer();
+
+const VTermWriter = struct {
+    const Writer = std.io.Writer(
+        *VTermWriter,
+        error{},
+        write,
+    );
+    pub const Error = anyerror;
+
+    pub fn writeAll(self: *const VTermWriter, data: []const u8) error{}!void {
+        _ = try write(self, data);
+    }
+
+    pub fn write(self: *const VTermWriter, data: []const u8) error{}!usize {
+        _ = self;
+        _ = terminal.vterm_input_write(vterm, data.ptr, data.len);
+        return data.len;
+    }
+
+    pub fn writer(self: *VTermWriter) Writer {
+        return .{ .context = self };
+    }
+};
+
+//pub fn getWriter() *VTermWriter {
+//    return &cw;
+//}
