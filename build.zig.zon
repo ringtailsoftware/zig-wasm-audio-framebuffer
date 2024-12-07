@@ -31,6 +31,10 @@
             .url = "git+https://github.com/ringtailsoftware/zeptolibc.git#4fc60035e39c90fa35cc1a85ea2b6c2462bd0d9a",
             .hash = "12204555e5408e7548edd8b70e562ac1d66a2a98b918ff96aaba7bdc3d261a11c778",
         },
+        .mibu = .{
+            .url = "git+https://github.com/xyaman/mibu.git#5cbda43f41f4d1f2769dd32523d8c1b474a4c60f",
+            .hash = "12205e93ed17ab3081a9d5289c2665e67873501f069a6210e02f3d8178a0c6e3156a",
+        },
     },
     .paths = .{
         "build.zig",

@@ -65,6 +65,13 @@ fn addExample(b: *std.Build, comptime name: []const u8, flags: ?[]const []const 
     exe.addIncludePath(zeptolibc_dep.path("src/"));
     exe.addIncludePath(b.path("src/"));
 
+    const mibu = b.dependency("mibu", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
+    exe.root_module.addImport("mibu", mibu.module("mibu"));
+
     b.installFile("src/" ++ name ++ "/" ++ name ++ ".html", name ++ ".html");
 
     // if assets dir exists in project, add @embedFile everything in it

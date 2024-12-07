@@ -142,9 +142,7 @@ export class WasmPcm {
         // attach key handlers
         if (globalInstance.exports.keyevent) {
             document.addEventListener('keydown', (event) => {
-                if (!event.repeat) {
-                    globalInstance.exports.keyevent(event.keyCode, true);
-                }
+                globalInstance.exports.keyevent(event.keyCode, true, event.repeat);
             });
             document.addEventListener('keyup', (event) => {
                 globalInstance.exports.keyevent(event.keyCode, false);
