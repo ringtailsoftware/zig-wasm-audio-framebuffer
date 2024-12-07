@@ -36,6 +36,19 @@ void free_wrapper(void *p) {
     free(p);
 }
 
+static void* doom_malloc_impl(int size)
+{
+    return malloc((size_t)size);
+}
+static void doom_free_impl(void* ptr) {
+    free(ptr);
+}
+static void doom_exit_impl(int code)
+{
+    exit(code);
+}
+
+
 char error_buf[260];
 int doom_flags = 0;
 doom_print_fn doom_print = 0;
