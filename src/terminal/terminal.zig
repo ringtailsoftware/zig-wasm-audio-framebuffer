@@ -19,7 +19,7 @@ const ROWS:usize = 24;
 const COLS:usize = 80;
 const FONTSIZE:usize = 16;
 
-const castData = Game.Assets.ASSET_MAP.get("637727.cast").?;
+const castData = Game.Assets.ASSET_MAP.get("637727.cast");
 
 var castplayer:CastPlayer = undefined;
 
@@ -191,10 +191,14 @@ export fn init() void {
     // init zepto with a memory allocator and console writer
     zeptolibc.init(allocator, consoleWriteFn);
 
-    castplayer = CastPlayer.init(allocator, castData) catch |err| {
-        _ = console.print("err {any}\n", .{err}) catch 0;
-        return;
-    };
+    if (castData) |data| {
+        castplayer = CastPlayer.init(allocator, data) catch |err| {
+            _ = console.print("err {any}\n", .{err}) catch 0;
+            return;
+        };
+    } else {
+        _ = console.print("cast data missing\n", .{}) catch 0;
+    }
 
     gSurface = Game.Surface.init(&gfxFramebuffer, 0, 0, WIDTH, HEIGHT, WIDTH);
     gRenderer = Game.Renderer.init(&gSurface);
@@ -216,13 +220,14 @@ export fn init() void {
 export fn update(deltaMs: u32) void {
     _ = deltaMs;
 
-    while (castplayer.getData()) |s| {
+    while (castplayer.getData(millis())) |s| {
         _ = terminal.vterm_input_write(vterm, s.ptr, s.len);
     }
 }
 
 export fn renderGfx() void {
     // background
+
     gRenderer.fill(0xFF000000); // black background
 
     for (0..ROWS) |y| {

@@ -1,6 +1,5 @@
 const std = @import("std");
 const console = @import("console.zig").getWriter().writer();
-const millis = @import("terminal.zig").millis;
 
 // Extract an asciinema .cast file, each line is a complete JSON array with 3 elements
 // calling getData() repeatedly will give each line as the timestamps dictate
@@ -19,6 +18,7 @@ pub const CastPlayer = struct {
 
     // assume it's available forever
     pub fn init(allocator: std.mem.Allocator, lineData:[]const u8) !Self {
+
         var vals = std.ArrayList(CastPlayerStep).init(allocator);
         var fbs = std.io.fixedBufferStream(lineData);
         var br = std.io.bufferedReader(fbs.reader());
@@ -27,22 +27,33 @@ pub const CastPlayer = struct {
         while(true) {
             var msg_buf: [4096]u8 = undefined;
             const msg = r.readUntilDelimiterOrEof(&msg_buf, '\n');
+
             if (msg) |m| {
                 if (m) |jsonline| {
                     const parsed = try std.json.parseFromSlice(std.json.Value, allocator, jsonline, .{});
-
                     defer parsed.deinit();
-                    const arr = parsed.value.array.items;
-                    var step:CastPlayerStep = .{.t = 0, .s = undefined};
-                    switch(arr[0]) {
-                        .float => |f| step.t = f,
+
+                    switch(parsed.value) {
+                        .array => |arr| {
+                            var step:CastPlayerStep = undefined;
+
+
+                            if (arr.items.len == 3) {
+                                switch(arr.items[0]) {
+                                    .float => |f| step.t = f,
+                                    else => step.t = 0,
+                                }
+                                switch(arr.items[2]) {
+                                    .string => |s| step.s = try allocator.dupe(u8, s),
+                                    else => {},
+                                }
+
+                                try vals.append(step);
+                            }
+
+                        },
                         else => {},
                     }
-                    switch(arr[2]) {
-                        .string => |s| step.s = try allocator.dupe(u8, s),
-                        else => {},
-                    }
-                    try vals.append(step);
                 } else {
                     break;
                 }
@@ -59,18 +70,23 @@ pub const CastPlayer = struct {
         };
     }
 
-    pub fn getData(self: *Self) ?[]const u8 {
-        if (self.startTime != null) {
-            self.startTime = millis();
+    pub fn getData(self: *Self, timems:u32) ?[]const u8 {
+        if (self.vals.items.len == 0) {
+            return null;
+        }
+
+
+        if (self.startTime == null) {
+            self.startTime = timems;
             self.dataIndex = 0;
         }
 
-        if (self.dataIndex > self.vals.items.len-1) {   // completed
+        if (self.dataIndex == self.vals.items.len) {   // completed
             return null;
         }
 
         const step = self.vals.items[self.dataIndex];
-        if (millis() >= self.startTime.? + @as(u32, @intFromFloat(step.t * 1000))) {
+        if (timems >= self.startTime.? + @as(u32, @intFromFloat(step.t * 1000))) {
             self.dataIndex += 1;
             return step.s;
         } else {
