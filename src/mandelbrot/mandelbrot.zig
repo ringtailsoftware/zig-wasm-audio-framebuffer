@@ -36,7 +36,8 @@ pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize)
     _ = trace;
     @setCold(true);
     _ = console.print("PANIC: {s}", .{msg}) catch 0;
-    while (true) {}
+    //while (true) {}
+    unreachable;
 }
 
 extern fn getTimeUs() u32;
@@ -233,9 +234,11 @@ fn redraw() void {
             } else false;
 
             if (escaped) {
+                const i:u8 = @as(u8, @intCast(iterations % 256));
+
                 const r8: u8 = 0;
-                const g8: u8 = @intCast(iterations);
-                const b8: u8 = 255 - @as(u8, @intCast(iterations));
+                const g8: u8 = i;
+                const b8: u8 = 255 - i;
                 renderBuffer[pix_y * WIDTH + pix_x] = 0xFF000000 | @as(u32, b8) << 16 | @as(u32, g8) << 8 | @as(u32, r8);
             } else {
                 renderBuffer[pix_y * WIDTH + pix_x] = 0xFF000000;
