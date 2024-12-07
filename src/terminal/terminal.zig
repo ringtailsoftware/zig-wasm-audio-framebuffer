@@ -19,7 +19,7 @@ const ROWS:usize = 24;
 const COLS:usize = 80;
 const FONTSIZE:usize = 16;
 
-const castData = Game.Assets.ASSET_MAP.get("zoridor.cast").?;
+const castData = Game.Assets.ASSET_MAP.get("637727.cast").?;
 
 var castplayer:CastPlayer = undefined;
 
