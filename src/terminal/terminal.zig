@@ -1,17 +1,14 @@
 const std = @import("std");
 const console = @import("console.zig").getWriter().writer();
 const zeptolibc = @import("zeptolibc");
-const terminal = @cImport({
-    @cInclude("libvterm/terminal.h");
-});
-const CastPlayer = @import("castplay.zig").CastPlayer;
+const ZVTerm = @import("zvterm").ZVTerm;
 
 const mibu = @import("mibu");
-const zigtris = @import("zigtris/main.zig");
+const zigtris = @import("zigtris");
 var nextEvent:mibu.events.Event = .none;
 
-var vterm:?*terminal.VTerm = null;
-var screen:?*terminal.VTermScreen = null;
+var term:ZVTerm = undefined;
+var termwriter:ZVTerm.TermWriter.Writer = undefined;
 
 const Game = @import("game.zig").Game;
 var gFontSmall: Game.Font = undefined;
@@ -22,10 +19,6 @@ var gRenderer: Game.Renderer = undefined;
 const ROWS:usize = 24;
 const COLS:usize = 80;
 const FONTSIZE:usize = 16;
-
-const castData = Game.Assets.ASSET_MAP.get("637727.cast");
-
-var castplayer:CastPlayer = undefined;
 
 // WebAudio's render quantum size.
 const RENDER_QUANTUM_FRAMES = 128;
@@ -115,106 +108,9 @@ export fn getRightBufPtr() [*]u8 {
 
 export fn renderSoundQuantum() void {}
 
-fn output_callback(s:[*c]const u8, len:usize, user:?*anyopaque) callconv(.C) void {
-    _ = s;
-    _ = len;
-    _ = user;
-    //_ = console.print("output_callback\n", .{}) catch 0;
-}
-
-fn damageFn(rect:terminal.VTermRect, user:?*anyopaque) callconv(.C) c_int {
-    _ = rect;
-    _ = user;
-    //_ = console.print("damage\n", .{}) catch 0;
-    return 0;
-}
-
-fn moverectFn(dest:terminal.VTermRect, src:terminal.VTermRect, user:?*anyopaque) callconv(.C) c_int {
-    _ = dest;
-    _ = src;
-    _ = user;
-    //_ = console.print("moverect\n", .{}) catch 0;
-    return 0;
-}
-
-fn movecursorFn(pos:terminal.VTermPos, oldpos:terminal.VTermPos, visible:c_int, user:?*anyopaque) callconv(.C) c_int {
-    _ = pos;
-    _ = oldpos;
-    _ = visible;
-    _ = user;
-    //_ = console.print("movecursor\n", .{}) catch 0;
-    return 0;
-}
-
-fn settermpropFn(prop:terminal.VTermProp, val:?*terminal.VTermValue, user:?*anyopaque) callconv(.C) c_int {
-    _ = prop;
-    _ = val;
-    _ = user;
-    //_ = console.print("settermprop\n", .{}) catch 0;
-    return 0;
-}
-
-fn bellFn(user:?*anyopaque) callconv(.C) c_int {
-    _ = user;
-    //_ = console.print("bell\n", .{}) catch 0;
-    return 0;
-}
-
-fn resizeFn(rows:c_int, cols:c_int, user:?*anyopaque) callconv(.C) c_int {
-    _ = user;
-    _ = rows;
-    _ = cols;
-    //_ = console.print("resize\n", .{}) catch 0;
-    return 0;
-}
-
-fn sb_pushlineFn(cols:c_int, cells:?[*]const terminal.VTermScreenCell, user:?*anyopaque) callconv(.C) c_int {
-    _ = cols;
-    _ = cells;
-    _ = user;
-    //_ = console.print("sb_pushlineFn\n", .{}) catch 0;
-    return 0;
-}
-
-fn sb_poplineFn(cols:c_int, cells:?[*]terminal.VTermScreenCell, user:?*anyopaque) callconv(.C) c_int {
-    _ = cols;
-    _ = cells;
-    _ = user;
-    //_ = console.print("sb_poplineFn\n", .{}) catch 0;
-    return 0;
-}
-
-fn sb_clearFn(user:?*anyopaque) callconv(.C) c_int {
-    _ = user;
-    //_ = console.print("sb_clear\n", .{}) catch 0;
-    return 0;
-}
-
-const screen_callbacks:terminal.VTermScreenCallbacks = .{
-    // FIXME
-    .damage = damageFn,
-    .moverect = moverectFn,
-    .movecursor = movecursorFn,
-    .settermprop = settermpropFn,
-    .bell = bellFn,
-    .resize = resizeFn,
-    .sb_pushline = sb_pushlineFn,
-    .sb_popline = sb_poplineFn,
-    .sb_clear = sb_clearFn,
-};
-
 export fn init() void {
     // init zepto with a memory allocator and console writer
     zeptolibc.init(allocator, consoleWriteFn);
-
-    if (castData) |data| {
-        castplayer = CastPlayer.init(allocator, data) catch |err| {
-            _ = console.print("err {any}\n", .{err}) catch 0;
-            return;
-        };
-    } else {
-        _ = console.print("cast data missing\n", .{}) catch 0;
-    }
 
     gSurface = Game.Surface.init(&gfxFramebuffer, 0, 0, WIDTH, HEIGHT, WIDTH);
     gRenderer = Game.Renderer.init(&gSurface);
@@ -230,23 +126,13 @@ export fn init() void {
 
     startTime = getTimeUs();
 
-    vterm = terminal.vterm_new(ROWS, COLS);
-    terminal.vterm_output_set_callback(vterm, output_callback, null);
-    screen = terminal.vterm_obtain_screen(vterm);
-    terminal.vterm_screen_set_callbacks(screen, &screen_callbacks, null);
-    terminal.vterm_screen_reset(screen, 1);
+    term = ZVTerm.init(80, 24) catch |err| {
+        _ = console.print("err {any}\n", .{err}) catch 0;
+        return;
+    };
+    termwriter = term.getWriter();
 
-    _ = mibu.cursor.goTo(vtermwriter, 10, 10) catch 0;
-    try mibu.color.fg256(vtermwriter, .yellow);
-    try mibu.color.bg256(vtermwriter, .blue);
-    _ = vtermwriter.print("Hello 10,10", .{}) catch 0;
-    _ = mibu.cursor.goTo(vtermwriter, 10, 12) catch 0;
-    try mibu.color.fg256(vtermwriter, .white);
-    try mibu.color.bg256(vtermwriter, .black);
-    try mibu.style.bold(vtermwriter);
-    _ = vtermwriter.print("Bold 10,12", .{}) catch 0;
-
-    try zigtris.gamesetup(vtermwriter, millis());
+    try zigtris.gamesetup(termwriter, millis());
 
 }
 
@@ -256,21 +142,16 @@ export fn update(deltaMs: u32) void {
     _ = deltaMs;
 
     if (millis() > lastUpdate + 100 or nextEvent != .none) {
-        const gameRunning = zigtris.gameloop(vtermwriter, millis(), nextEvent) catch false;
+        const gameRunning = zigtris.gameloop(termwriter, millis(), nextEvent) catch false;
         nextEvent = .none;
         if (!gameRunning) {
             _ = console.print("new game!\n", .{}) catch 0;
 
-            _ = zigtris.gamesetup(vtermwriter, millis()) catch 0;
+            _ = zigtris.gamesetup(termwriter, millis()) catch 0;
         }
 
         lastUpdate = millis();
     }
-
-
-//    while (castplayer.getData(millis())) |s| {
-//        _ = terminal.vterm_input_write(vterm, s.ptr, s.len);
-//    }
 }
 
 export fn renderGfx() void {
@@ -279,70 +160,19 @@ export fn renderGfx() void {
 
     for (0..ROWS) |y| {
         for (0..COLS) |x| {
-            const pos:terminal.VTermPos = .{.row=@intCast(y), .col=@intCast(x)};
-            var cell:terminal.VTermScreenCell = undefined;
-            _ = terminal.vterm_screen_get_cell(screen, pos, &cell);
-            if (cell.chars[0] != 0) {
-                var buf:[16]u8 = undefined;
-                buf[0] = @intCast(cell.chars[0]);
-                const sl = buf[0..1];
-
-                var fgcolour:u32 = 0xFFFFFFFF;    // white
-                var bgcolour:u32 = 0x00000000;    // transparent
-                if (terminal.VTERM_COLOR_IS_INDEXED(&cell.fg)) {
-                    terminal.vterm_screen_convert_color_to_rgb(screen, &cell.fg);
-                }
-                if (terminal.VTERM_COLOR_IS_RGB(&cell.fg)) {
-                    fgcolour = @as(u32, @intCast(0xFF)) << 24 | @as(u32, @intCast(cell.fg.rgb.blue)) << 16 | @as(u32, @intCast(cell.fg.rgb.green)) << 8 | @as(u32, @intCast(cell.fg.rgb.red));
-                }
-                if (terminal.VTERM_COLOR_IS_INDEXED(&cell.bg)) {
-                    terminal.vterm_screen_convert_color_to_rgb(screen, &cell.bg);
-                }
-                if (terminal.VTERM_COLOR_IS_RGB(&cell.bg)) {
-                    bgcolour = @as(u32, @intCast(0xFF)) << 24 | @as(u32, @intCast(cell.bg.rgb.blue)) << 16 | @as(u32, @intCast(cell.bg.rgb.green)) << 8 | @as(u32, @intCast(cell.bg.rgb.red));
-                }
-
+            const cell = term.getCell(x, y);
+            if (cell.char) |c| {
                 var font:*Game.Font = &gFontSmall;
-                if (cell.attrs.bold > 0) {
+                if (cell.bold) {
                     font = &gFontSmallBold;
                 }
 
-                gRenderer.fillRect(Game.Rect.init(@floatFromInt(x*FONTSIZE/2), @floatFromInt(y*FONTSIZE), FONTSIZE/2, FONTSIZE), bgcolour);
+                gRenderer.fillRect(Game.Rect.init(@floatFromInt(x*FONTSIZE/2), @floatFromInt(y*FONTSIZE), FONTSIZE/2, FONTSIZE), cell.bgRGBA);
 
-                //gRenderer.drawRect(Game.Rect.init(@floatFromInt(x*FONTSIZE/2), @floatFromInt(y*FONTSIZE), FONTSIZE/2, FONTSIZE), 0xFF404040);
                 const yo:i32 = -4;
-                gRenderer.drawString(font, sl, @intCast(x*FONTSIZE/2), @as(i32, @intCast(y*FONTSIZE+FONTSIZE)) + yo, fgcolour);
+                gRenderer.drawString(font, &.{c}, @intCast(x*FONTSIZE/2), @as(i32, @intCast(y*FONTSIZE+FONTSIZE)) + yo, cell.fgRGBA);
             }
         }
     }
 }
 
-var vtw = VTermWriter{};
-var vtermwriter = vtw.writer();
-
-const VTermWriter = struct {
-    const Writer = std.io.Writer(
-        *VTermWriter,
-        error{},
-        write,
-    );
-    pub const Error = anyerror;
-
-    pub fn writeAll(self: *const VTermWriter, data: []const u8) error{}!void {
-        _ = try write(self, data);
-    }
-
-    pub fn write(self: *const VTermWriter, data: []const u8) error{}!usize {
-        _ = self;
-        _ = terminal.vterm_input_write(vterm, data.ptr, data.len);
-        return data.len;
-    }
-
-    pub fn writer(self: *VTermWriter) Writer {
-        return .{ .context = self };
-    }
-};
-
-//pub fn getWriter() *VTermWriter {
-//    return &cw;
-//}

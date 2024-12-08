@@ -63,15 +63,33 @@ fn addExample(b: *std.Build, comptime name: []const u8, flags: ?[]const []const 
     });
     exe.root_module.addImport("zeptolibc", zeptolibc_dep.module("zeptolibc"));
     exe.root_module.addIncludePath(zeptolibc_dep.path("include"));
+    exe.root_module.addIncludePath(zeptolibc_dep.path("include/zeptolibc"));
 
-    exe.addIncludePath(b.path("src/"));
+    // add zvterm for terminal example
+    const zvterm_dep = b.dependency("zvterm", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    var zvterm_mod = zvterm_dep.module("zvterm");
+    zvterm_mod.addIncludePath(zeptolibc_dep.path("include"));
+    zvterm_mod.addIncludePath(zeptolibc_dep.path("include/zeptolibc"));
+    exe.root_module.addImport("zvterm", zvterm_mod);
 
+    // add mibu for zigtris event generation
     const mibu = b.dependency("mibu", .{
         .target = target,
         .optimize = optimize,
     });
-
     exe.root_module.addImport("mibu", mibu.module("mibu"));
+
+    // add zigtris for terminal example
+    const zigtris = b.dependency("zigtris", .{
+        .target = target,
+        .optimize = optimize,
+    });
+    exe.root_module.addImport("zigtris", zigtris.module("zigtris"));
+
+    exe.addIncludePath(b.path("src/"));
 
     b.installFile("src/" ++ name ++ "/" ++ name ++ ".html", name ++ ".html");
 
@@ -104,17 +122,7 @@ pub fn build(b: *std.Build) !void {
 
     try addExample(b, "terminal", &.{"-Wall", "-fno-sanitize=undefined"},&.{
         "src/terminal/olive.c/olive.c",
-        "src/terminal/stb_truetype.c",
-        "src/terminal/libvterm/terminal.c", 
-        "src/terminal/libvterm/encoding.c",
-        "src/terminal/libvterm/mouse.c",
-        "src/terminal/libvterm/pen.c",
-        "src/terminal/libvterm/state.c",
-        "src/terminal/libvterm/vterm.c",
-        "src/terminal/libvterm/keyboard.c",
-        "src/terminal/libvterm/parser.c",
-        "src/terminal/libvterm/screen.c",
-        "src/terminal/libvterm/unicode.c"},
+        "src/terminal/stb_truetype.c"},
     null);
 
     try addExample(b, "agnes", &.{"-Wall", "-fno-sanitize=undefined"}, &.{"src/agnes/agnes.c"}, null);
