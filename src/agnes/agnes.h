@@ -1,3 +1,4 @@
+#include <zeptolibc/zeptolibc.h>
 /*
 SPDX-License-Identifier: MIT
 
@@ -41,8 +42,6 @@ extern "C"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-
-#include "zeptolibc.h"
 
 enum {
     AGNES_SCREEN_WIDTH = 256,
