@@ -5,7 +5,7 @@
  * Z buffer
  */
 
-#include "zeptolibc.h"
+#include <zeptolibc/zeptolibc.h>
 
 #include "zfeatures.h"
 

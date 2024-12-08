@@ -62,7 +62,8 @@ fn addExample(b: *std.Build, comptime name: []const u8, flags: ?[]const []const 
         .optimize = optimize,
     });
     exe.root_module.addImport("zeptolibc", zeptolibc_dep.module("zeptolibc"));
-    exe.addIncludePath(zeptolibc_dep.path("src/"));
+    exe.root_module.addIncludePath(zeptolibc_dep.path("include"));
+
     exe.addIncludePath(b.path("src/"));
 
     b.installFile("src/" ++ name ++ "/" ++ name ++ ".html", name ++ ".html");

@@ -1,8 +1,6 @@
 #ifndef _tgl_zgl_h_
 #define _tgl_zgl_h_
 
-#include "zeptolibc.h"
-
 #define NULL ((void *)0)
 #define M_PI 3.14159265358979323846264338328
 
@@ -15,11 +13,11 @@
 #define zsqrt sqrt
 #define zpow pow
 
-//#include <stdlib.h>
-//#include <stdio.h>
+#include <stdlib.h>
+#include <stdio.h>
 //#include <math.h>
 //#include <assert.h>
-//#include <string.h>
+#include <string.h>
 #include <GL/gl.h>
 #include "zbuffer.h"
 #include "zmath.h"

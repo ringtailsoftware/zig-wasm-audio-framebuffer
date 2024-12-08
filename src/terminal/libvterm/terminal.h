@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <stdarg.h>
 
-#include "zeptolibc.h"
+#include <zeptolibc/zeptolibc.h>
 
 #include "libvterm/vterm.h"
 

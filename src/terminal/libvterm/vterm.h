@@ -9,7 +9,7 @@ extern "C" {
 #include <stdlib.h>
 #include <stdbool.h>
 
-#include "zeptolibc.h"
+#include <zeptolibc/zeptolibc.h>
 
 #include "vterm_keycodes.h"
 

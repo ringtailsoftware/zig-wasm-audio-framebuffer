@@ -32,7 +32,7 @@
 #ifndef __DOOM_H__
 #define __DOOM_H__
 
-#include "zeptolibc.h"
+#include <zeptolibc/zeptolibc.h>
 
 #pragma pack(push, 1)
 

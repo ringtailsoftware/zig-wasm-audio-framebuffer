@@ -1,6 +1,6 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 
-#include "zeptolibc.h"
+#include <zeptolibc/zeptolibc.h>
 
 #define STBTT_ifloor(x)   ((int) floor(x))
 #define STBTT_iceil(x)    ((int) ceil(x))

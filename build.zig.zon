@@ -28,8 +28,8 @@
             .hash = "12209083b0c43d0f68a26a48a7b26ad9f93b22c9cff710c78ddfebb47b89cfb9c7a4",
         },
         .zeptolibc = .{
-            .url = "git+https://github.com/ringtailsoftware/zeptolibc.git#3b87af23668bb3834bd964201990ee06d02606dc",
-            .hash = "12206a118dbe6ccbe0a2673dbae777e1126f768292d9f61bf69ddecaf2881301bdc1",
+            .url = "git+https://github.com/ringtailsoftware/zeptolibc.git#03717dc35bd1eb7b0d5afe0438bee73793ca8334",
+            .hash = "12202a7c100a234ad042d4e1eda738e04652a1b20ddc50aed529954702198fa09f42",
         },
     },
     .paths = .{
