@@ -21,7 +21,7 @@ Visit https://ringtailsoftware.github.io/zig-wasm-audio-framebuffer
  - TinyGL, software GL renderer in Wasm
  - OliveC, graphics library with sprite blit, circle, rectangle, line, etc.
  - Agnes, NES emulator (no sound)
- - Terminal, libvterm based terminal emulator, playing back an Asciinema .cast file recording
+ - Terminal, libvterm based terminal emulator, playing a terminal tetris game
 
 ## Aims
 
