@@ -20,7 +20,7 @@ jobs:
         with:
           path: zig-wasm-audio-framebuffer
       - name: Setup Zig
-        uses: goto-bus-stop/setup-zig@v1
+        uses: mlugg/setup-zig@v1
         with:
           version: 0.13.0
       - name: Build
