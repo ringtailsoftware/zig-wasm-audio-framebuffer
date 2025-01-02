@@ -2,8 +2,8 @@ const std = @import("std");
 const assets = @import("assets");
 
 const EmbeddedAsset = struct {
-    []const u8 = undefined,
-    []const u8 = undefined,
+    []const u8,
+    []const u8,
 };
 
 pub const Assets = struct {

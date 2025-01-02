@@ -61,7 +61,6 @@ fn consoleWriteFn(data:[]const u8) void {
 pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {
     _ = ret_addr;
     _ = trace;
-    @setCold(true);
     _ = console.print("PANIC: {s}", .{msg}) catch 0;
     while (true) {}
 }

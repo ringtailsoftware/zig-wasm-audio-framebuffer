@@ -9,7 +9,7 @@ pub fn addAssetsOption(b: *std.Build, exe:anytype, assetpath:[]const u8) !void {
     var files = std.ArrayList([]const u8).init(b.allocator);
     defer files.deinit();
 
-    var buf: [std.fs.MAX_PATH_BYTES]u8 = undefined;
+    var buf: [std.fs.max_path_bytes]u8 = undefined;
     const path = try std.fs.cwd().realpath(assetpath, buf[0..]);
 
     var dir = try std.fs.openDirAbsolute(path, .{.iterate=true});
@@ -24,7 +24,7 @@ pub fn addAssetsOption(b: *std.Build, exe:anytype, assetpath:[]const u8) !void {
     exe.step.dependOn(&options.step);
 
     const assets = b.addModule("assets", .{
-        .root_source_file = options.getSource(),
+        .root_source_file = options.getOutput(),
         .target = target,
         .optimize = optimize,
     });
@@ -109,9 +109,11 @@ fn addExample(b: *std.Build, comptime name: []const u8, flags: ?[]const []const 
 pub fn build(b: *std.Build) !void {
     const hosttarget = b.standardTargetOptions(.{});
     optimize = b.standardOptimizeOption(.{});
-    target = b.resolveTargetQuery(std.zig.CrossTarget.parse(
-            .{ .arch_os_abi = "wasm32-freestanding" },
-    ) catch unreachable);
+
+    target = b.resolveTargetQuery(.{
+        .cpu_arch = .wasm32,
+        .os_tag = .freestanding,
+    });
 
     b.installFile("src/index.html", "index.html");
     b.installFile("src/pcm-processor.js", "pcm-processor.js");
