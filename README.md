@@ -4,7 +4,7 @@ Toby Jaffey https://mastodon.me.uk/@tobyjaffey
 
 Straightforward examples of integrating Zig and Wasm for audio and graphics on the web.
 
-Compiling against Zig v0.13.0.
+Compiling against Zig v0.14.0.
 
 Where C code requires functions from the C library, https://github.com/ringtailsoftware/zeptolibc is used.
 
