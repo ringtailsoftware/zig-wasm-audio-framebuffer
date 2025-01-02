@@ -61,7 +61,6 @@ pub const std_options: std.Options = .{
 };
 
 pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {
-    @setCold(true);
     _ = console.print("PANIC: {s} ret_addr={any}\n", .{msg, ret_addr}) catch 0;
     _ = console.print("{any}\n", .{trace}) catch 0;
     while (true) {}

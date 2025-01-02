@@ -40,7 +40,7 @@ pub fn SpecializeOn(comptime Real: type) type {
                 /// subtracts all components from `a` with the components of `b`.
                 pub fn sub(a: Self, b: Self) Self {
                     var result: Self = undefined;
-                    inline for (@typeInfo(Self).Struct.fields) |fld| {
+                    inline for (@typeInfo(Self).@"struct".fields) |fld| {
                         @field(result, fld.name) = @field(a, fld.name) - @field(b, fld.name);
                     }
                     return result;

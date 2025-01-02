@@ -16,7 +16,7 @@ var mix_right: [RENDER_QUANTUM_FRAMES]f32 = undefined;
 
 var startTime: u32 = 0;
 
-var prng = std.rand.DefaultPrng.init(0);
+var prng = std.Random.DefaultPrng.init(0);
 var rand = prng.random();
 
 const NUMBALLS = 1000;
@@ -79,7 +79,6 @@ pub const std_options: std.Options = .{
 pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {
     _ = ret_addr;
     _ = trace;
-    @setCold(true);
     _ = console.print("PANIC: {s}", .{msg}) catch 0;
     while (true) {}
 }

@@ -36,12 +36,12 @@
             .hash = "12202a7c100a234ad042d4e1eda738e04652a1b20ddc50aed529954702198fa09f42",
         },
         .mibu = .{
-            .url = "git+https://github.com/xyaman/mibu.git#5cbda43f41f4d1f2769dd32523d8c1b474a4c60f",
-            .hash = "12205e93ed17ab3081a9d5289c2665e67873501f069a6210e02f3d8178a0c6e3156a",
+            .url = "git+https://github.com/xyaman/mibu.git#b001662c929e2719ee24be585a3120640f946337",
+            .hash = "1220d78664322b50e31a99cfb004b6fa60c43098d95abf7ec60a21ebeaf1c914edaf",
         },
         .zigtris = .{
-            .url = "git+https://github.com/ringtailsoftware/zigtris.git#3fe5309a45ec0877ab108f6d3144cc84e93c4420",
-            .hash = "1220efba806754c7047c8d6058878b8623fa49890db25edbb2129e461cdd0d016034",
+            .url = "git+https://github.com/ringtailsoftware/zigtris.git#7563ff5421974857ee8e745f7ae020874f2954af",
+            .hash = "122062266e1f9482cd9601be6ecb8cacc91cc8c9a912e3a8c4e48a69827869dc17ec",
         },
     },
     .paths = .{
