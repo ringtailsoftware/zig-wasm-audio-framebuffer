@@ -36,6 +36,6 @@ jobs:
           path: "zig-wasm-audio-framebuffer/zig-out"
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v2
+        uses: actions/deploy-pages@v3
 
 
