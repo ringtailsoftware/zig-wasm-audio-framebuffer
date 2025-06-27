@@ -6,11 +6,12 @@
     //
     // It is redundant to include "zig" in this name because it is already
     // within the Zig package namespace.
-    .name = "zig-wasm-audio-framebuffer",
+    .name = .zig_wasm_audio_framebuffer,
+    .fingerprint = 0xf48e3c75aea16b00,
 
     // This is a [Semantic Version](https://semver.org/).
     // In a future version of Zig it will be used for package deduplication.
-    .version = "0.0.0",
+    .version = "0.0.1",
 
     // This field is optional.
     // This is currently advisory only; Zig does not yet do anything
@@ -32,8 +33,8 @@
             .hash = "12207e677beeb14481d932fe7d2c97d0ae9b968053753f0639690e00d5ceaabb8800",
         },
         .zeptolibc = .{
-            .url = "git+https://github.com/ringtailsoftware/zeptolibc.git#03717dc35bd1eb7b0d5afe0438bee73793ca8334",
-            .hash = "12202a7c100a234ad042d4e1eda738e04652a1b20ddc50aed529954702198fa09f42",
+            .url = "git+https://github.com/ringtailsoftware/zeptolibc.git#229791c08b4309d154e4fec3e90ab1900215c0da",
+            .hash = "zeptolibc-0.0.1-T3flJ9w3AABROzhiPaD0vDIdsgPlgpKHNFYTBxxmrsAL",
         },
         .mibu = .{
             .url = "git+https://github.com/xyaman/mibu.git#b001662c929e2719ee24be585a3120640f946337",
