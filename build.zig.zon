@@ -25,10 +25,9 @@
     // internet connectivity.
     .dependencies = .{
         .zeptolibc = .{
-            .url = "git+https://github.com/ringtailsoftware/zeptolibc.git#3b1a193cea41c4fd7c3e4f97171bcf233cbdaf89",
-            .hash = "zeptolibc-0.0.1-T3flJ3U9AACUVuYXtZL3tbN9nOfY3tkGpv8Y4sYr0vkr",
+            .url = "git+https://github.com/ringtailsoftware/zeptolibc.git#d787abfdd597bee5616a439f12393e11fb370822",
+            .hash = "zeptolibc-0.0.1-T3flJ4M4AAAEx1K1DS-SmkmuXvJJ3JqnNHIw4Aqo0PfD",
         },
-
         .mime = .{
             .url = "git+https://github.com/andrewrk/mime.git#4535b74bd5fcaa03e22f2f25af164a4c6253af00",
             .hash = "mime-4.0.0-zwmL--0gAACndOVlROQeDnM0chfojNDS8tpohlsBqMNy",
