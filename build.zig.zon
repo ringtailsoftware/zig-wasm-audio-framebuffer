@@ -33,13 +33,10 @@
             .url = "git+https://github.com/andrewrk/mime.git#4535b74bd5fcaa03e22f2f25af164a4c6253af00",
             .hash = "mime-4.0.0-zwmL--0gAACndOVlROQeDnM0chfojNDS8tpohlsBqMNy",
         },
-//        .zvterm = .{
-//            .url = "git+https://github.com/ringtailsoftware/zvterm.git#05cee2f1d00c7b4cec0eb9f7beef0b48918b748b",
-//            .hash = "zvterm-0.0.1-VuAjA4JnAwAqsAyUTtgA60fx5WNSOnnO68VHq2kCdl0s",
-//        },
-    .zvterm = .{
-    .path = "../zvterm",
-    },
+        .zvterm = .{
+            .url = "git+https://github.com/ringtailsoftware/zvterm.git#05cee2f1d00c7b4cec0eb9f7beef0b48918b748b",
+            .hash = "zvterm-0.0.1-VuAjA4JnAwAqsAyUTtgA60fx5WNSOnnO68VHq2kCdl0s",
+        },
         .zigtris = .{
             .url = "git+https://github.com/ringtailsoftware/zigtris.git#1dc9fc4c5dae709279bfe0708e3fae5c810837f0",
             .hash = "zigtris-0.0.1-of0vIotsAACy777-kWnBDCH2tYIprpqXLpidQgvRF6r1",
