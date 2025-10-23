@@ -6,7 +6,7 @@ var target:std.Build.ResolvedTarget = undefined;
 pub fn addAssetsOption(b: *std.Build, exe:anytype, assetpath:[]const u8) !void {
     var options = b.addOptions();
 
-    var files = std.ArrayList([]const u8).init(b.allocator);
+    var files = std.array_list.Managed([]const u8).init(b.allocator);
     defer files.deinit();
 
     var buf: [std.fs.max_path_bytes]u8 = undefined;
@@ -35,10 +35,11 @@ pub fn addAssetsOption(b: *std.Build, exe:anytype, assetpath:[]const u8) !void {
 fn addExample(b: *std.Build, comptime name: []const u8, flags: ?[]const []const u8, sources: ?[]const []const u8, includes: ?[]const []const u8) !void {
     const exe = b.addExecutable(.{
         .name = name,
-        .root_source_file = b.path("src/" ++ name ++ "/" ++ name ++ ".zig"),
-        .target = target,
-        .optimize = optimize,
-        .strip = false,
+        .root_module = b.createModule(.{ // this line was added
+            .root_source_file = b.path("src/" ++ name ++ "/" ++ name ++ ".zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
     exe.entry = .disabled;
     exe.rdynamic = true;
@@ -82,12 +83,19 @@ fn addExample(b: *std.Build, comptime name: []const u8, flags: ?[]const []const 
     });
     exe.root_module.addImport("mibu", mibu.module("mibu"));
 
-    // add zigtris for terminal example
-    const zigtris = b.dependency("zigtris", .{
+    const zlm = b.dependency("zlm", .{
         .target = target,
         .optimize = optimize,
     });
-    exe.root_module.addImport("zigtris", zigtris.module("zigtris"));
+    exe.root_module.addImport("zlm", zlm.module("zlm"));
+
+    const zigtris_dep = b.dependency("zigtris", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const zigtris_mod = zigtris_dep.module("zigtris");
+    exe.root_module.addImport("zigtris", zigtris_mod);
 
     exe.addIncludePath(b.path("src/"));
 
@@ -131,35 +139,35 @@ pub fn build(b: *std.Build) !void {
 
     try addExample(b, "sinetone", null, null, null);
 
-//    try addExample(b, "synth", null, null, null);
+    try addExample(b, "synth", null, null, null);
 
-//    try addExample(b, "mod", &.{"-Wall"}, &.{"src/mod/pocketmod.c"}, null);
+    try addExample(b, "mod", &.{"-Wall"}, &.{"src/mod/pocketmod.c"}, null);
 
-//    try addExample(b, "bat", &.{"-Wall"}, &.{"src/mod/pocketmod.c"}, null);
+    try addExample(b, "bat", &.{"-Wall"}, &.{"src/mod/pocketmod.c"}, null);
 
-//    try addExample(b, "doom", &.{ "-Wall", "-fno-sanitize=undefined" }, &.{
-//        "src/doom/puredoom/DOOM.c",     "src/doom/puredoom/PureDOOM.c", "src/doom/puredoom/am_map.c",
-//        "src/doom/puredoom/d_items.c",  "src/doom/puredoom/d_main.c",   "src/doom/puredoom/d_net.c",
-//        "src/doom/puredoom/doomdef.c",  "src/doom/puredoom/doomstat.c", "src/doom/puredoom/dstrings.c",
-//        "src/doom/puredoom/f_finale.c", "src/doom/puredoom/f_wipe.c",   "src/doom/puredoom/g_game.c",
-//        "src/doom/puredoom/hu_lib.c",   "src/doom/puredoom/hu_stuff.c", "src/doom/puredoom/i_net.c",
-//        "src/doom/puredoom/i_sound.c",  "src/doom/puredoom/i_system.c", "src/doom/puredoom/i_video.c",
-//        "src/doom/puredoom/info.c",     "src/doom/puredoom/m_argv.c",   "src/doom/puredoom/m_bbox.c",
-//        "src/doom/puredoom/m_cheat.c",  "src/doom/puredoom/m_fixed.c",  "src/doom/puredoom/m_menu.c",
-//        "src/doom/puredoom/m_misc.c",   "src/doom/puredoom/m_random.c", "src/doom/puredoom/m_swap.c",
-//        "src/doom/puredoom/p_ceilng.c", "src/doom/puredoom/p_doors.c",  "src/doom/puredoom/p_enemy.c",
-//        "src/doom/puredoom/p_floor.c",  "src/doom/puredoom/p_inter.c",  "src/doom/puredoom/p_lights.c",
-//        "src/doom/puredoom/p_map.c",    "src/doom/puredoom/p_maputl.c", "src/doom/puredoom/p_mobj.c",
-//        "src/doom/puredoom/p_plats.c",  "src/doom/puredoom/p_pspr.c",   "src/doom/puredoom/p_saveg.c",
-//        "src/doom/puredoom/p_setup.c",  "src/doom/puredoom/p_sight.c",  "src/doom/puredoom/p_spec.c",
-//        "src/doom/puredoom/p_switch.c", "src/doom/puredoom/p_telept.c", "src/doom/puredoom/p_tick.c",
-//        "src/doom/puredoom/p_user.c",   "src/doom/puredoom/r_bsp.c",    "src/doom/puredoom/r_data.c",
-//        "src/doom/puredoom/r_draw.c",   "src/doom/puredoom/r_main.c",   "src/doom/puredoom/r_plane.c",
-//        "src/doom/puredoom/r_segs.c",   "src/doom/puredoom/r_sky.c",    "src/doom/puredoom/r_things.c",
-//        "src/doom/puredoom/s_sound.c",  "src/doom/puredoom/sounds.c",   "src/doom/puredoom/st_lib.c",
-//        "src/doom/puredoom/st_stuff.c", "src/doom/puredoom/tables.c",   "src/doom/puredoom/v_video.c",
-//        "src/doom/puredoom/w_wad.c",    "src/doom/puredoom/wi_stuff.c", "src/doom/puredoom/z_zone.c",
-//    }, null);
+    try addExample(b, "doom", &.{ "-Wall", "-fno-sanitize=undefined" }, &.{
+        "src/doom/puredoom/DOOM.c",     "src/doom/puredoom/PureDOOM.c", "src/doom/puredoom/am_map.c",
+        "src/doom/puredoom/d_items.c",  "src/doom/puredoom/d_main.c",   "src/doom/puredoom/d_net.c",
+        "src/doom/puredoom/doomdef.c",  "src/doom/puredoom/doomstat.c", "src/doom/puredoom/dstrings.c",
+        "src/doom/puredoom/f_finale.c", "src/doom/puredoom/f_wipe.c",   "src/doom/puredoom/g_game.c",
+        "src/doom/puredoom/hu_lib.c",   "src/doom/puredoom/hu_stuff.c", "src/doom/puredoom/i_net.c",
+        "src/doom/puredoom/i_sound.c",  "src/doom/puredoom/i_system.c", "src/doom/puredoom/i_video.c",
+        "src/doom/puredoom/info.c",     "src/doom/puredoom/m_argv.c",   "src/doom/puredoom/m_bbox.c",
+        "src/doom/puredoom/m_cheat.c",  "src/doom/puredoom/m_fixed.c",  "src/doom/puredoom/m_menu.c",
+        "src/doom/puredoom/m_misc.c",   "src/doom/puredoom/m_random.c", "src/doom/puredoom/m_swap.c",
+        "src/doom/puredoom/p_ceilng.c", "src/doom/puredoom/p_doors.c",  "src/doom/puredoom/p_enemy.c",
+        "src/doom/puredoom/p_floor.c",  "src/doom/puredoom/p_inter.c",  "src/doom/puredoom/p_lights.c",
+        "src/doom/puredoom/p_map.c",    "src/doom/puredoom/p_maputl.c", "src/doom/puredoom/p_mobj.c",
+        "src/doom/puredoom/p_plats.c",  "src/doom/puredoom/p_pspr.c",   "src/doom/puredoom/p_saveg.c",
+        "src/doom/puredoom/p_setup.c",  "src/doom/puredoom/p_sight.c",  "src/doom/puredoom/p_spec.c",
+        "src/doom/puredoom/p_switch.c", "src/doom/puredoom/p_telept.c", "src/doom/puredoom/p_tick.c",
+        "src/doom/puredoom/p_user.c",   "src/doom/puredoom/r_bsp.c",    "src/doom/puredoom/r_data.c",
+        "src/doom/puredoom/r_draw.c",   "src/doom/puredoom/r_main.c",   "src/doom/puredoom/r_plane.c",
+        "src/doom/puredoom/r_segs.c",   "src/doom/puredoom/r_sky.c",    "src/doom/puredoom/r_things.c",
+        "src/doom/puredoom/s_sound.c",  "src/doom/puredoom/sounds.c",   "src/doom/puredoom/st_lib.c",
+        "src/doom/puredoom/st_stuff.c", "src/doom/puredoom/tables.c",   "src/doom/puredoom/v_video.c",
+        "src/doom/puredoom/w_wad.c",    "src/doom/puredoom/wi_stuff.c", "src/doom/puredoom/z_zone.c",
+    }, null);
 
 
     try addExample(b, "tinygl", &.{ "-Wall", "-fno-sanitize=undefined" }, &.{
@@ -182,9 +190,11 @@ pub fn build(b: *std.Build) !void {
     // web server
     const serve_exe = b.addExecutable(.{
         .name = "serve",
-        .root_source_file = b.path("httpserver/serve.zig"),
-        .target = hosttarget,
-        .optimize = optimize,
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("httpserver/serve.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
     });
 
     const mod_server = b.addModule("StaticHttpFileServer", .{

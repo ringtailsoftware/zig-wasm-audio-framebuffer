@@ -1,5 +1,5 @@
 const std = @import("std");
-const console = @import("console.zig").getWriter().writer();
+const console = @import("console.zig").getWriter();
 const zeptolibc = @import("zeptolibc");
 const ZVTerm = @import("zvterm").ZVTerm;
 
@@ -7,8 +7,8 @@ const mibu = @import("mibu");
 const zigtris = @import("zigtris");
 var nextEvent:mibu.events.Event = .none;
 
-var term:ZVTerm = undefined;
-var termwriter:ZVTerm.TermWriter.Writer = undefined;
+var term:*ZVTerm = undefined;
+var termwriter:*std.Io.Writer = undefined;
 
 const Game = @import("game.zig").Game;
 var gFontSmall: Game.Font = undefined;
@@ -44,6 +44,7 @@ const allocator = gpa.allocator();
 
 fn consoleWriteFn(data:[]const u8) void {
     _ = console.print("{s}", .{data}) catch 0;
+    _ = console.flush() catch 0;
 }
 
 pub fn logFn(
@@ -55,6 +56,7 @@ pub fn logFn(
     _ = message_level;
     _ = scope;
     _ = console.print(format, args) catch 0;
+    _ = console.flush() catch 0;
 }
 
 pub const std_options: std.Options = .{
@@ -64,10 +66,10 @@ pub const std_options: std.Options = .{
 pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {
     _ = ret_addr;
     _ = trace;
-    _ = console.print("PANIC: {s}", .{msg}) catch 0;
-    while (true) {}
+    _ = console.print("PANIC: {s}\n", .{msg}) catch 0;
+    _ = console.flush() catch 0;
+    unreachable;
 }
-
 extern fn getTimeUs() u32;
 pub fn millis() u32 {
     return (getTimeUs() - startTime) / 1000;
@@ -79,11 +81,11 @@ export fn keyevent(keycode: u32, down: bool, isRepeat:bool) void {
 
     if (down) {
         switch(keycode) {
-            32 => nextEvent = mibu.events.Event{.key = .{.char = ' '}},
-            37 => nextEvent = mibu.events.Event{.key = .left},
-            39 => nextEvent = mibu.events.Event{.key = .right},
-            38 => nextEvent = mibu.events.Event{.key = .up},
-            40 => nextEvent = mibu.events.Event{.key = .down},
+            32 => nextEvent = mibu.events.Event{.key = .{.code = .{.char = ' '}}},
+            37 => nextEvent = mibu.events.Event{.key = .{.code = .left}},
+            39 => nextEvent = mibu.events.Event{.key = .{.code = .right}},
+            38 => nextEvent = mibu.events.Event{.key = .{.code = .up}},
+            40 => nextEvent = mibu.events.Event{.key = .{.code = .down}},
             else => {},
         }
     }
@@ -116,23 +118,29 @@ export fn init() void {
 
     gFontSmall = Game.Font.init("pc.ttf", FONTSIZE) catch |err| {
         _ = console.print("err {any}\n", .{err}) catch 0;
+        _ = console.flush() catch 0;
         return;
     };
     gFontSmallBold = Game.Font.init("pc-bold.ttf", FONTSIZE) catch |err| {
         _ = console.print("err {any}\n", .{err}) catch 0;
+        _ = console.flush() catch 0;
         return;
     };
 
     startTime = getTimeUs();
 
-    term = ZVTerm.init(80, 24) catch |err| {
+    term = ZVTerm.init(allocator, 80, 24) catch |err| {
         _ = console.print("err {any}\n", .{err}) catch 0;
+        _ = console.flush() catch 0;
         return;
     };
     termwriter = term.getWriter();
 
-    try zigtris.gamesetup(termwriter, millis());
-
+    zigtris.gamesetup(termwriter, millis()) catch |err| {
+        _ = console.print("err {any}\n", .{err}) catch 0;
+        _ = console.flush() catch 0;
+        return;
+    };
 }
 
 var lastUpdate:u32 = 0;
@@ -142,9 +150,11 @@ export fn update(deltaMs: u32) void {
 
     if (millis() > lastUpdate + 100 or nextEvent != .none) {
         const gameRunning = zigtris.gameloop(termwriter, millis(), nextEvent) catch false;
+        _ = termwriter.flush() catch 0;
         nextEvent = .none;
         if (!gameRunning) {
             _ = console.print("new game!\n", .{}) catch 0;
+            _ = console.flush() catch 0;
 
             _ = zigtris.gamesetup(termwriter, millis()) catch 0;
         }
@@ -166,10 +176,10 @@ export fn renderGfx() void {
                     font = &gFontSmallBold;
                 }
 
-                gRenderer.fillRect(Game.Rect.init(@floatFromInt(x*FONTSIZE/2), @floatFromInt(y*FONTSIZE), FONTSIZE/2, FONTSIZE), cell.bgRGBA);
+                gRenderer.fillRect(Game.Rect.init(@floatFromInt(x*FONTSIZE/2), @floatFromInt(y*FONTSIZE), FONTSIZE/2, FONTSIZE), cell.bg.raw);
 
                 const yo:i32 = -4;
-                gRenderer.drawString(font, &.{c}, @intCast(x*FONTSIZE/2), @as(i32, @intCast(y*FONTSIZE+FONTSIZE)) + yo, cell.fgRGBA);
+                gRenderer.drawString(font, &.{c}, @intCast(x*FONTSIZE/2), @as(i32, @intCast(y*FONTSIZE+FONTSIZE)) + yo, cell.fg.raw);
             }
         }
     }

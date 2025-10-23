@@ -1,7 +1,7 @@
 const std = @import("std");
-const console = @import("console.zig").getWriter().writer();
+const console = @import("console.zig").getWriter();
 const spriteData = @embedFile("zero64.raw");
-const math = @import("zlm.zig");
+const math = @import("zlm").as(f32);
 const Vec2 = math.Vec2;
 const vec2 = math.vec2;
 
@@ -70,6 +70,7 @@ pub fn logFn(
     _ = message_level;
     _ = scope;
     _ = console.print(format, args) catch 0;
+    _ = console.flush() catch 0;
 }
 
 pub const std_options: std.Options = .{
@@ -79,8 +80,9 @@ pub const std_options: std.Options = .{
 pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {
     _ = ret_addr;
     _ = trace;
-    _ = console.print("PANIC: {s}", .{msg}) catch 0;
-    while (true) {}
+    _ = console.print("PANIC: {s}\n", .{msg}) catch 0;
+    _ = console.flush() catch 0;
+    unreachable;
 }
 
 extern fn getTimeUs() u32;
@@ -162,6 +164,7 @@ fn printFPS() void {
     if (millis() > lastFPSTime + 1000) {
         lastFPS = frameCount / (millis() / 1000);
         _ = console.print("FPS {d}\n", .{lastFPS}) catch 0;
+        _ = console.flush() catch 0;
         lastFPSTime = millis();
     }
     frameCount +%= 1;

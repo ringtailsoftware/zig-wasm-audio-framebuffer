@@ -24,25 +24,33 @@
     // Once all dependencies are fetched, `zig build` no longer requires
     // internet connectivity.
     .dependencies = .{
-        .mime = .{
-            .url = "https://github.com/andrewrk/mime/archive/refs/tags/2.0.1.tar.gz",
-            .hash = "12209083b0c43d0f68a26a48a7b26ad9f93b22c9cff710c78ddfebb47b89cfb9c7a4",
-        },
-        .zvterm = .{
-            .url = "git+https://github.com/ringtailsoftware/zvterm.git#7617c3610f0dd491c197ba03f3149c4040ff6845",
-            .hash = "12207e677beeb14481d932fe7d2c97d0ae9b968053753f0639690e00d5ceaabb8800",
-        },
         .zeptolibc = .{
-            .url = "git+https://github.com/ringtailsoftware/zeptolibc.git#229791c08b4309d154e4fec3e90ab1900215c0da",
-            .hash = "zeptolibc-0.0.1-T3flJ9w3AABROzhiPaD0vDIdsgPlgpKHNFYTBxxmrsAL",
+            .url = "git+https://github.com/ringtailsoftware/zeptolibc.git#3b1a193cea41c4fd7c3e4f97171bcf233cbdaf89",
+            .hash = "zeptolibc-0.0.1-T3flJ3U9AACUVuYXtZL3tbN9nOfY3tkGpv8Y4sYr0vkr",
+        },
+
+        .mime = .{
+            .url = "git+https://github.com/andrewrk/mime.git#4535b74bd5fcaa03e22f2f25af164a4c6253af00",
+            .hash = "mime-4.0.0-zwmL--0gAACndOVlROQeDnM0chfojNDS8tpohlsBqMNy",
+        },
+//        .zvterm = .{
+//            .url = "git+https://github.com/ringtailsoftware/zvterm.git#05cee2f1d00c7b4cec0eb9f7beef0b48918b748b",
+//            .hash = "zvterm-0.0.1-VuAjA4JnAwAqsAyUTtgA60fx5WNSOnnO68VHq2kCdl0s",
+//        },
+    .zvterm = .{
+    .path = "../zvterm",
+    },
+        .zigtris = .{
+            .url = "git+https://github.com/ringtailsoftware/zigtris.git#1dc9fc4c5dae709279bfe0708e3fae5c810837f0",
+            .hash = "zigtris-0.0.1-of0vIotsAACy777-kWnBDCH2tYIprpqXLpidQgvRF6r1",
         },
         .mibu = .{
-            .url = "git+https://github.com/xyaman/mibu.git#b001662c929e2719ee24be585a3120640f946337",
-            .hash = "1220d78664322b50e31a99cfb004b6fa60c43098d95abf7ec60a21ebeaf1c914edaf",
+            .url = "git+https://github.com/xyaman/mibu.git#be3713ff04e7db3584669e679253ef388e426dc6",
+            .hash = "mibu-0.0.1-dev-Ddr1riTEAAAYAe1TWBT--W8fPUL8UyBE7dy-yNNZ3z5V",
         },
-        .zigtris = .{
-            .url = "git+https://github.com/ringtailsoftware/zigtris.git#7563ff5421974857ee8e745f7ae020874f2954af",
-            .hash = "122062266e1f9482cd9601be6ecb8cacc91cc8c9a912e3a8c4e48a69827869dc17ec",
+        .zlm = .{
+            .url = "git+https://github.com/ziglibs/zlm.git#b4fcb32f98bd895f940ef8819c375ac3f89077d7",
+            .hash = "zlm-0.1.0-LoZ6yI2sAACW1YdckJV4qm7HXCGcRkkk_wO36dUi5qcQ",
         },
     },
     .paths = .{
