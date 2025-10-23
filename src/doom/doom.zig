@@ -1,5 +1,5 @@
 const std = @import("std");
-const console = @import("console.zig").getWriter().writer();
+const console = @import("console.zig").getWriter();
 const ziggysynth = @import("ziggysynth.zig");
 
 const zeptolibc = @import("zeptolibc");
@@ -13,6 +13,7 @@ const wad_data = @embedFile("doom1.wad");
 const SoundFont = ziggysynth.SoundFont;
 const Synthesizer = ziggysynth.Synthesizer;
 const SynthesizerSettings = ziggysynth.SynthesizerSettings;
+var reader = std.Io.Reader.fixed(synth_font);
 
 const RENDER_QUANTUM_FRAMES = 128; // WebAudio's render quantum size
 
@@ -43,6 +44,7 @@ const allocator = gpa.allocator();
 
 fn consoleWriteFn(data:[]const u8) void {
     _ = console.print("{s}", .{data}) catch 0;
+    _ = console.flush() catch 0;
 }
 
 pub fn logFn(
@@ -54,6 +56,7 @@ pub fn logFn(
     _ = message_level;
     _ = scope;
     _ = console.print(format, args) catch 0;
+    _ = console.flush() catch 0;
 }
 
 pub const std_options: std.Options = .{
@@ -61,38 +64,43 @@ pub const std_options: std.Options = .{
 };
 
 pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {
-    _ = console.print("PANIC: {s} ret_addr={any}\n", .{msg, ret_addr}) catch 0;
-    _ = console.print("{any}\n", .{trace}) catch 0;
-    while (true) {}
+    _ = ret_addr;
+    _ = trace;
+    _ = console.print("PANIC: {s}\n", .{msg}) catch 0;
+    _ = console.flush() catch 0;
+    unreachable;
 }
 
 extern fn getTimeUs() u32;
 
 // implement a backend for puredoom
-export fn doom_print_impl(msg: [*:0]const u8) callconv(.C) void {
+export fn doom_print_impl(msg: [*:0]const u8) callconv(.c) void {
     _ = console.print("{s}", .{std.mem.span(msg)}) catch 0;
+    _ = console.flush() catch 0;
 }
 
-export fn doom_gettime_impl(sec: *c_int, usec: *c_int) callconv(.C) void {
+export fn doom_gettime_impl(sec: *c_int, usec: *c_int) callconv(.c) void {
     sec.* = @intCast(millis() / 1000);
     usec.* = @intCast(@mod(millis() * 1000, 1000000));
 }
 
-export fn doom_open_impl(filename: [*:0]const u8, mode: [*]const u8) callconv(.C) ?*c_int {
+export fn doom_open_impl(filename: [*:0]const u8, mode: [*]const u8) callconv(.c) ?*c_int {
     _ = mode;
     _ = console.print("doom_open_impl {s}\n", .{std.mem.span(filename)}) catch 0;
+    _ = console.flush() catch 0;
     if (std.mem.eql(u8, std.mem.span(filename), "/doom1.wad")) {
         return WAD_FILE_HANDLE;
     }
     return null;
 }
-export fn doom_close_impl(handle: *anyopaque) callconv(.C) void {
+export fn doom_close_impl(handle: *anyopaque) callconv(.c) void {
     // don't care, all files are in memory
     _ = handle;
 }
-export fn doom_read_impl(handle: *c_int, buf: [*]u8, count: c_int) callconv(.C) c_int {
+export fn doom_read_impl(handle: *c_int, buf: [*]u8, count: c_int) callconv(.c) c_int {
     if (handle != WAD_FILE_HANDLE) {
         _ = console.print("doom_read_impl invalid handle!\n", .{}) catch 0;
+        _ = console.flush() catch 0;
         return 0;
     }
     const dst = buf[0..@intCast(count)];
@@ -102,16 +110,18 @@ export fn doom_read_impl(handle: *c_int, buf: [*]u8, count: c_int) callconv(.C) 
     wad_stream_offset += @intCast(count);
     return count;
 }
-export fn doom_write_impl(handle: *c_int, buf: *const anyopaque, count: c_int) callconv(.C) c_int {
+export fn doom_write_impl(handle: *c_int, buf: *const anyopaque, count: c_int) callconv(.c) c_int {
     _ = handle;
     _ = buf;
     _ = count;
     _ = console.print("doom_write_impl unsupported!\n", .{}) catch 0;
+    _ = console.flush() catch 0;
     return 0;
 }
-export fn doom_seek_impl(handle: *c_int, offset: c_int, origin: pd.doom_seek_t) callconv(.C) c_int {
+export fn doom_seek_impl(handle: *c_int, offset: c_int, origin: pd.doom_seek_t) callconv(.c) c_int {
     if (handle != WAD_FILE_HANDLE) {
         _ = console.print("doom_seek_impl invalid handle!\n", .{}) catch 0;
+        _ = console.flush() catch 0;
         return 0;
     }
     switch (origin) {
@@ -122,16 +132,18 @@ export fn doom_seek_impl(handle: *c_int, offset: c_int, origin: pd.doom_seek_t) 
     }
     return 0;
 }
-export fn doom_tell_impl(handle: *c_int) callconv(.C) c_int {
+export fn doom_tell_impl(handle: *c_int) callconv(.c) c_int {
     if (handle != WAD_FILE_HANDLE) {
         _ = console.print("doom_tell_impl invalid handle!\n", .{}) catch 0;
+        _ = console.flush() catch 0;
         return 0;
     }
     return @intCast(wad_stream_offset);
 }
-export fn doom_eof_impl(handle: *c_int) callconv(.C) c_int {
+export fn doom_eof_impl(handle: *c_int) callconv(.c) c_int {
     if (handle != WAD_FILE_HANDLE) {
         _ = console.print("doom_eof_impl invalid handle!\n", .{}) catch 0;
+        _ = console.flush() catch 0;
         return 1;
     }
     if (wad_stream_offset >= wad_data.len) {
@@ -161,10 +173,8 @@ export fn setSampleRate(s: f32) void {
     sampleRate = s;
 
     // create the synthesizer
-    var fbs = std.io.fixedBufferStream(synth_font);
-    const reader = fbs.reader();
-    var sound_font = SoundFont.init(allocator, reader) catch unreachable;
-    var settings = SynthesizerSettings.init(@intFromFloat(s));
+    const sound_font = SoundFont.init(allocator, &reader) catch unreachable;
+    var settings = SynthesizerSettings.init(@intFromFloat(sampleRate));
     settings.block_size = RENDER_QUANTUM_FRAMES;
     synthesizer = Synthesizer.init(allocator, &sound_font, &settings) catch unreachable;
 }
@@ -253,6 +263,7 @@ var frameCount: usize = 0;
 fn printFPS() void {
     if (millis() > lastFPSTime + 1000) {
         _ = console.print("FPS {d}\n", .{frameCount / (millis() / 1000)}) catch 0;
+        _ = console.flush() catch 0;
         lastFPSTime = millis();
     }
     frameCount +%= 1;

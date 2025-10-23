@@ -1,5 +1,5 @@
 const std = @import("std");
-const console = @import("console.zig").getWriter().writer();
+const console = @import("console.zig").getWriter();
 const zeptolibc = @import("zeptolibc");
 const agnes = @cImport({
     @cInclude("agnes.h");

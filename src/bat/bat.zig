@@ -1,16 +1,15 @@
 const std = @import("std");
-const console = @import("console.zig").getWriter().writer();
+const console = @import("console.zig").getWriter();
 const ziggysynth = @import("ziggysynth.zig");
 const pocketmod = @cImport({
     @cInclude("pocketmod.h");
 });
-
-const synth_font = @embedFile("TimGM6mb.sf2");
 const mod_data = @embedFile("escape.mod");
 
 const SoundFont = ziggysynth.SoundFont;
 const Synthesizer = ziggysynth.Synthesizer;
 const SynthesizerSettings = ziggysynth.SynthesizerSettings;
+var reader = std.Io.Reader.fixed(@embedFile("TimGM6mb.sf2"));
 
 // WebAudio's render quantum size.
 const RENDER_QUANTUM_FRAMES = 128;
@@ -38,6 +37,7 @@ var rand = prng.random();
 var startTime: u32 = 0;
 
 const COLOUR_BLACK = 0xFF000000;
+const COLOUR_BLUE = 0xFFFF0000;
 const COLOUR_WHITE = 0xFFFFFFFF;
 
 var ballx: f32 = undefined;
@@ -75,6 +75,7 @@ pub fn logFn(
     _ = message_level;
     _ = scope;
     _ = console.print(format, args) catch 0;
+    _ = console.flush() catch 0;
 }
 
 pub const std_options: std.Options = .{
@@ -84,8 +85,9 @@ pub const std_options: std.Options = .{
 pub fn panic(msg: []const u8, trace: ?*std.builtin.StackTrace, ret_addr: ?usize) noreturn {
     _ = ret_addr;
     _ = trace;
-    _ = console.print("PANIC: {s}", .{msg}) catch 0;
-    while (true) {}
+    _ = console.print("PANIC: {s}\n", .{msg}) catch 0;
+    _ = console.flush() catch 0;
+    unreachable;
 }
 
 extern fn getTimeUs() u32;
@@ -127,9 +129,7 @@ export fn setSampleRate(s: f32) void {
     // create the synthesizer
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
-    var fbs = std.io.fixedBufferStream(synth_font);
-    const reader = fbs.reader();
-    const sound_font = SoundFont.init(allocator, reader) catch unreachable;
+    const sound_font = SoundFont.init(allocator, &reader) catch unreachable;
     var settings = SynthesizerSettings.init(@as(i32, @intFromFloat(s)));
     settings.block_size = RENDER_QUANTUM_FRAMES;
     synthesizer = Synthesizer.init(allocator, &sound_font, &settings) catch unreachable;
@@ -169,17 +169,28 @@ export fn renderSoundQuantum() void {
 }
 
 export fn init() void {
+    _ = console.print("init", .{}) catch 0;
+    _ = console.flush() catch 0;
+
     startTime = getTimeUs();
     frameCount = 0;
 
+    _ = console.print("initA\n", .{}) catch 0; _ = console.flush() catch 0;
+
     game_init();
 
+    _ = console.print("initB\n", .{}) catch 0; _ = console.flush() catch 0;
+
     fillRect(0, 0, WIDTH, HEIGHT, COLOUR_BLACK);
+
+    _ = console.print("initC\n", .{}) catch 0; _ = console.flush() catch 0;
+
 }
 
 export fn update(deltaMs: u32) void {
     if (deltaMs > 100) {
         _ = console.print("Skipping\n", .{}) catch 0;
+        _ = console.flush() catch 0;
         return;
     }
 
@@ -190,7 +201,7 @@ export fn update(deltaMs: u32) void {
     // left and right
     const newballx = ballx + ballxd * deltaScale;
     if (newballx < 0 or newballx >= WIDTH) {
-        synthesizer.noteOn(0, 48, 127);
+//        synthesizer.noteOn(0, 48, 127);
         ballxd = -ballxd;
     } else {
         ballx = newballx;
@@ -198,7 +209,7 @@ export fn update(deltaMs: u32) void {
     // top
     const newbally = bally + ballyd * deltaScale;
     if (newbally < 0) {
-        synthesizer.noteOn(0, 55, 127);
+//        synthesizer.noteOn(0, 55, 127);
         ballyd = -ballyd;
     }
 
@@ -207,11 +218,11 @@ export fn update(deltaMs: u32) void {
         // bounce
         ballyd = -ballyd;
         bally = baty - 1;
-        synthesizer.noteOn(9, 60, 127);
+//        synthesizer.noteOn(9, 60, 127);
     } else {
         if (newbally >= HEIGHT) {
             // dead
-            synthesizer.noteOn(0, 36, 127);
+//            synthesizer.noteOn(0, 36, 127);
             game_init();
         } else {
             bally = newbally;
@@ -273,6 +284,7 @@ var frameCount: usize = 0;
 fn printFPS() void {
     if (millis() > lastFPSTime + 1000) {
         _ = console.print("FPS {d}\n", .{frameCount / (millis() / 1000)}) catch 0;
+        _ = console.flush() catch 0;
         lastFPSTime = millis();
     }
     frameCount +%= 1;
@@ -325,9 +337,9 @@ fn HSVtoRGB(h: f32, s: f32, v: f32) u32 {
     const rf = std.math.round(r * 255);
     const gf = std.math.round(g * 255);
     const bf = std.math.round(b * 255);
-    const r8: u8 = @intFromFloat(rf);
-    const g8: u8 = @intFromFloat(gf);
-    const b8: u8 = @intFromFloat(bf);
+    const r8: u32 = @intFromFloat(rf);
+    const g8: u32 = @intFromFloat(gf);
+    const b8: u32 = @intFromFloat(bf);
     const colour: u32 = 0xFF000000 | @as(u32, b8) << 16 | @as(u32, g8) << 8 | @as(u32, r8);
     return colour;
 }
@@ -346,23 +358,32 @@ fn drawPlasma() void {
             value /= 8; // bring range down to 0 .. 1
 
             const t: f32 = @as(f32, @floatFromInt(millis())) / 10000;
-
             gfxFramebuffer[@as(usize, @intFromFloat(y)) * WIDTH + @as(usize, @intFromFloat(x))] = HSVtoRGB(value + t, 0.5, 2);
         }
     }
 }
 
 export fn renderGfx() void {
+    _ = console.print("renderA\n", .{}) catch 0; _ = console.flush() catch 0;
+
     // background
-    // fillRect(0, 0, WIDTH, HEIGHT, COLOUR_BLACK);
+    fillRect(0, 0, WIDTH, HEIGHT, COLOUR_BLUE);
     drawPlasma();
+
+    _ = console.print("renderB\n", .{}) catch 0; _ = console.flush() catch 0;
 
     // ball
     fillRect(@intFromFloat(ballx - 4), @intFromFloat(bally - 4), 8, 8, COLOUR_BLACK);
     fillRect(@intFromFloat(ballx - 2), @intFromFloat(bally - 2), 4, 4, COLOUR_WHITE);
 
+    _ = console.print("renderC\n", .{}) catch 0; _ = console.flush() catch 0;
+
     // bat
     fillRect(@intFromFloat(batx), @intFromFloat(baty), @intFromFloat(batwidth), @intFromFloat(batheight), COLOUR_BLACK);
 
+    _ = console.print("renderD\n", .{}) catch 0; _ = console.flush() catch 0;
+
     printFPS();
+
+    _ = console.print("renderE\n", .{}) catch 0; _ = console.flush() catch 0;
 }

@@ -12,6 +12,7 @@ var left: [RENDER_QUANTUM_FRAMES]f32 = undefined;
 var right: [RENDER_QUANTUM_FRAMES]f32 = undefined;
 var sampleRate: f32 = 44100;
 var synthesizer: Synthesizer = undefined;
+var reader = std.Io.Reader.fixed(@embedFile("TimGM6mb.sf2"));
 
 pub fn logFn(
     comptime message_level: std.log.Level,
@@ -43,10 +44,7 @@ export fn setSampleRate(s: f32) void {
     // create the synthesizer
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     const allocator = gpa.allocator();
-    const data = @embedFile("TimGM6mb.sf2");
-    var fbs = std.io.fixedBufferStream(data);
-    const reader = fbs.reader();
-    const sound_font = SoundFont.init(allocator, reader) catch unreachable;
+    const sound_font = SoundFont.init(allocator, &reader) catch unreachable;
     var settings = SynthesizerSettings.init(@intFromFloat(s));
     settings.block_size = RENDER_QUANTUM_FRAMES;
     synthesizer = Synthesizer.init(allocator, &sound_font, &settings) catch unreachable;
