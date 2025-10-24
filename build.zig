@@ -124,6 +124,7 @@ pub fn build(b: *std.Build) !void {
     });
 
     b.installFile("src/index.html", "index.html");
+    b.installFile("src/404.html", "404.html");
     b.installFile("src/pcm-processor.js", "pcm-processor.js");
     b.installFile("src/wasmpcm.js", "wasmpcm.js");
     b.installFile("src/ringbuf.js", "ringbuf.js");
@@ -192,7 +193,7 @@ pub fn build(b: *std.Build) !void {
         .name = "serve",
         .root_module = b.createModule(.{
             .root_source_file = b.path("httpserver/serve.zig"),
-            .target = target,
+            .target = hosttarget,
             .optimize = optimize,
         }),
     });

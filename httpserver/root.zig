@@ -169,7 +169,7 @@ pub fn deinit(s: *Server, allocator: std.mem.Allocator) void {
     s.* = undefined;
 }
 
-pub const ServeError = error{FileNotFound} || std.http.Server.Response.WriteError;
+pub const ServeError = error{FileNotFound} || error{HttpExpectationFailed,WriteFailed};
 
 pub fn serve(s: *Server, request: *std.http.Server.Request) ServeError!void {
     const path = request.head.target;

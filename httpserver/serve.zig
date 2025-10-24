@@ -65,12 +65,16 @@ pub fn main() !void {
     std.debug.print("Listening at http://127.0.0.1:{d}/\n", .{port});
 
     var read_buffer: [8000]u8 = undefined;
+    var write_buffer: [8000]u8 = undefined;
     accept: while (true) {
-        const connection = try http_server.accept();
+        var connection = try http_server.accept();
         defer connection.stream.close();
 
-        var server = std.http.Server.init(connection, &read_buffer);
-        while (server.state == .ready) {
+        var reader = connection.stream.reader(&read_buffer);
+        var writer = connection.stream.writer(&write_buffer);
+
+        var server = std.http.Server.init(reader.interface(), &writer.interface);
+        while (server.reader.state == .ready) {
             var request = server.receiveHead() catch |err| {
                 std.debug.print("error: {s}\n", .{@errorName(err)});
                 continue :accept;
